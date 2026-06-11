@@ -17,13 +17,10 @@ interface PublishableItem {
   caption: string | null;
   scheduled_for: string;
   status: string;
-  retry_count: number;
-  error_message: string | null;
   // Joined from accounts table
   username: string;
   instagram_business_id: string;
-  encrypted_access_token: string;
-  token_iv: string;
+  access_token: string;
 }
 
 /**
@@ -106,13 +103,10 @@ export class CronPublisherService {
         caption,
         scheduled_for,
         status,
-        retry_count,
-        error_message,
         accounts (
           username,
           instagram_business_id,
-          encrypted_access_token,
-          token_iv
+          access_token
         )
       `,
       )
@@ -141,8 +135,7 @@ export class CronPublisherService {
       const account = raw.accounts as unknown as {
         username: string;
         instagram_business_id: string;
-        encrypted_access_token: string;
-        token_iv: string;
+        access_token: string;
       };
 
       if (!account) {
@@ -159,12 +152,9 @@ export class CronPublisherService {
         caption: raw.caption,
         scheduled_for: raw.scheduled_for,
         status: raw.status,
-        retry_count: raw.retry_count ?? 0,
-        error_message: raw.error_message,
         username: account.username,
         instagram_business_id: account.instagram_business_id,
-        encrypted_access_token: account.encrypted_access_token,
-        token_iv: account.token_iv,
+        access_token: account.access_token,
       };
 
       await this.processItem(item);
@@ -201,7 +191,7 @@ export class CronPublisherService {
         .select('*', { count: 'exact', head: true })
         .eq('account_id', item.account_id)
         .eq('status', 'published')
-        .gte('published_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        .gte('scheduled_for', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
       if (countError) {
         throw new Error(`Rate limit check failed: ${countError.message}`);
@@ -221,10 +211,11 @@ export class CronPublisherService {
 
     try {
       // --- Step 3: Decrypt the access token ---
-      const accessToken = this.encryptionService.decrypt(
-        item.encrypted_access_token,
-        item.token_iv,
-      );
+      const [iv, encryptedText] = item.access_token.split(':');
+      if (!iv || !encryptedText) {
+        throw new Error('Access token is missing IV or Ciphertext structure. Make sure you use the new format.');
+      }
+      const accessToken = this.encryptionService.decrypt(encryptedText, iv);
 
       // --- Step 4: Create the media container on Meta ---
       const containerId = await this.createMediaContainer(
@@ -264,8 +255,6 @@ export class CronPublisherService {
         .from('queue')
         .update({
           status: 'published',
-          published_at: new Date().toISOString(),
-          error_message: null,
         })
         .eq('id', item.id);
 
@@ -434,47 +423,20 @@ export class CronPublisherService {
           ? error.message
           : String(error);
 
-    const newRetryCount = (item.retry_count || 0) + 1;
+    this.logger.error(
+      `❌ Queue item "${item.id}" has failed. Marking as FAILED.`,
+      errorMessage,
+    );
 
-    if (newRetryCount >= MAX_RETRY_COUNT) {
-      // --- Permanent failure ---
-      this.logger.error(
-        `❌ Queue item "${item.id}" has failed ${MAX_RETRY_COUNT} times. Marking as FAILED.`,
-        errorMessage,
-      );
+    await supabase
+      .from('queue')
+      .update({
+        status: 'failed',
+      })
+      .eq('id', item.id);
 
-      await supabase
-        .from('queue')
-        .update({
-          status: 'failed',
-          retry_count: newRetryCount,
-          error_message: errorMessage.substring(0, 1000),
-        })
-        .eq('id', item.id);
-
-      // --- Send Slack failure alert ---
-      await this.sendFailureAlert(item, errorMessage);
-    } else {
-      // --- Exponential backoff retry ---
-      const backoffMs = BASE_BACKOFF_DELAY_MS * Math.pow(2, newRetryCount - 1);
-      const retryAt = new Date(Date.now() + backoffMs);
-
-      this.logger.warn(
-        `⚠️  Queue item "${item.id}" failed (attempt ${newRetryCount}/${MAX_RETRY_COUNT}). ` +
-          `Retrying at ${retryAt.toISOString()} (${backoffMs / 1000}s backoff).`,
-        errorMessage,
-      );
-
-      await supabase
-        .from('queue')
-        .update({
-          status: 'pending',
-          scheduled_for: retryAt.toISOString(),
-          retry_count: newRetryCount,
-          error_message: errorMessage.substring(0, 1000),
-        })
-        .eq('id', item.id);
-    }
+    // --- Send Slack failure alert ---
+    await this.sendFailureAlert(item, errorMessage);
   }
 
   /**

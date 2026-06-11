@@ -15,15 +15,21 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
+  const configService = app.get(ConfigService);
+  const frontendUrl = configService.get<string>('FRONTEND_URL');
+
   // Enable CORS so the React frontend (running on a different port) can
   // communicate with the backend API.
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://localhost:3001'],
+    origin: [
+      'http://localhost:5173',
+      ...(frontendUrl ? [frontendUrl] : []),
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true,
   });
 
-  const configService = app.get(ConfigService);
+
   const port = configService.get<number>('PORT') || 3000;
   await app.listen(port);
 

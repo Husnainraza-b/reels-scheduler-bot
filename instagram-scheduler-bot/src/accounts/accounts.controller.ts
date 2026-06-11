@@ -81,8 +81,7 @@ export class AccountsController {
       .insert({
         username,
         instagram_business_id,
-        encrypted_access_token: encryptedText,
-        token_iv: iv,
+        access_token: `${iv}:${encryptedText}`,
       })
       .select('id, username, instagram_business_id, created_at')
       .single();
@@ -129,8 +128,7 @@ export class AccountsController {
 
     if (access_token) {
       const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
-      updates.encrypted_access_token = encryptedText;
-      updates.token_iv = iv;
+      updates.access_token = `${iv}:${encryptedText}`;
     }
 
     if (Object.keys(updates).length === 0) {

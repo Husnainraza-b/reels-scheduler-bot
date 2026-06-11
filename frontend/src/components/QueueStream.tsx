@@ -141,14 +141,6 @@ export default function QueueStream({
                     <span className="text-xs text-text-muted">
                       {getAccountUsername(item.account_id, accounts)}
                     </span>
-
-                    {/* Retry indicator */}
-                    {item.retry_count > 0 && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs bg-danger/10 text-danger">
-                        <AlertTriangle className="w-3 h-3" />
-                        Retry {item.retry_count}
-                      </span>
-                    )}
                   </div>
 
                   {/* Schedule Time */}
@@ -184,15 +176,6 @@ export default function QueueStream({
                       {item.video_url.split('/').pop()}
                     </a>
                   </div>
-
-                  {/* Error Message */}
-                  {item.error_message && (
-                    <div className="mt-2 p-2 bg-danger/5 border border-danger/10 rounded-lg">
-                      <p className="text-xs text-danger font-mono">
-                        {item.error_message}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </div>
             );

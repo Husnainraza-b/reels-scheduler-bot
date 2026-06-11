@@ -40,6 +40,7 @@ export default function AccountsPanel({
   const [accessToken, setAccessToken] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
@@ -59,6 +60,7 @@ export default function AccountsPanel({
   const handleSaveAccountEdit = async (id: number) => {
     if (!editUsername || !editBusinessId) return;
     setIsSavingEdit(true);
+    setErrorMsg('');
     try {
       const payload: any = { username: editUsername, instagram_business_id: editBusinessId };
       if (editAccessToken) payload.access_token = editAccessToken;
@@ -67,8 +69,9 @@ export default function AccountsPanel({
       setSuccessMsg('Account updated successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
       onAccountCreated(); // We reuse this to fetch accounts
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to update account:', err);
+      setErrorMsg(err.response?.data?.error || 'Failed to update account');
     } finally {
       setIsSavingEdit(false);
     }
@@ -77,11 +80,13 @@ export default function AccountsPanel({
   const handleDeleteAccount = async (id: number) => {
     if (!window.confirm("Are you sure you want to delete this account?")) return;
     setDeletingId(id);
+    setErrorMsg('');
     try {
       await deleteAccount(id);
       onAccountDeleted();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to delete account:', err);
+      setErrorMsg(err.response?.data?.error || 'Failed to delete account');
     } finally {
       setDeletingId(null);
     }
@@ -92,6 +97,7 @@ export default function AccountsPanel({
     if (!username || !businessId || !accessToken) return;
 
     setIsSubmitting(true);
+    setErrorMsg('');
     try {
       await createAccount({
         username,
@@ -105,8 +111,9 @@ export default function AccountsPanel({
       setSuccessMsg('Account added successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
       onAccountCreated();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to create account:', err);
+      setErrorMsg(err.response?.data?.error || 'Failed to create account');
     } finally {
       setIsSubmitting(false);
     }
@@ -139,6 +146,14 @@ export default function AccountsPanel({
         <div className="flex items-center gap-2 mb-4 p-3 bg-success/10 border border-success/20 rounded-xl">
           <CheckCircle2 className="w-4 h-4 text-success" />
           <span className="text-sm text-success">{successMsg}</span>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMsg && (
+        <div className="flex items-center gap-2 mb-4 p-3 bg-danger/10 border border-danger/20 rounded-xl">
+          <X className="w-4 h-4 text-danger" />
+          <span className="text-sm text-danger">{errorMsg}</span>
         </div>
       )}
 

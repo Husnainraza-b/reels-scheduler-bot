@@ -70,6 +70,8 @@ export class SlackController {
     // --- Rule 2: Event Callback ---
     if (body.type === 'event_callback') {
       const { event } = body as SlackEventCallback;
+      this.logger.debug(`--> [CONTROLLER] Event callback triggered. Type: ${event.type}`);
+      this.logger.debug(`--> [CONTROLLER] Files attached: ${event.files ? event.files.length : 0}`);
 
       if (event.type === 'message' && event.files && event.files.length > 0) {
         this.logger.log(

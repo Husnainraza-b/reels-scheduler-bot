@@ -66,7 +66,9 @@ export class SlackService {
 
     // --- Step 1: Parse @username from caption ---
     const rawCaption = event.text?.trim() || '';
+    this.logger.debug(`--> [SERVICE] Raw caption received: ${rawCaption}`);
     const { username, caption } = this.parseCaption(rawCaption);
+    this.logger.debug(`--> [SERVICE] Extracted Username: ${username} | Cleaned Caption: ${caption}`);
 
     if (!username) {
       this.logger.warn(
@@ -83,7 +85,16 @@ export class SlackService {
     }
 
     // --- Step 2: Validate the account exists in the database ---
-    const account = await this.lookupAccount(username);
+    let account;
+    try {
+      account = await this.lookupAccount(username);
+      if (!account) {
+        this.logger.error(`[DB EXCEPTION] Account not found for username: ${username}`);
+      }
+    } catch (dbError) {
+      this.logger.error(`[DB EXCEPTION] Error during account lookup for username: ${username}`, dbError instanceof Error ? dbError.stack : String(dbError));
+      account = null;
+    }
 
     if (!account) {
       this.logger.warn(
@@ -145,22 +156,33 @@ export class SlackService {
           `☁️  Streaming "${uniqueFileName}" to Cloudflare R2...`,
         );
 
-        const publicUrl = await this.cloudflareR2Service.uploadVideo(
-          fileStream,
-          uniqueFileName,
-        );
-
-        this.logger.log(
-          `✅ Upload complete. Public URL: ${publicUrl}`,
-        );
+        let publicUrl;
+        try {
+          publicUrl = await this.cloudflareR2Service.uploadVideo(
+            fileStream,
+            uniqueFileName,
+          );
+          this.logger.log(
+            `✅ Upload complete. Public URL: ${publicUrl}`,
+          );
+        } catch (r2Error) {
+          this.logger.error(`[R2 EXCEPTION] Failed to upload video to Cloudflare R2: ${uniqueFileName}`, r2Error instanceof Error ? r2Error.stack : String(r2Error));
+          throw r2Error;
+        }
 
         // --- Add to queue via Gap Finder engine ---
-        const queueRecord = await this.schedulerService.addToQueue(
-          account.id,
-          publicUrl,
-          caption,
-          fileId,
-        );
+        let queueRecord;
+        try {
+          queueRecord = await this.schedulerService.addToQueue(
+            account.id,
+            publicUrl,
+            caption,
+            fileId,
+          );
+        } catch (dbError) {
+          this.logger.error(`[DB EXCEPTION] Failed to insert queue record via Gap Finder for account ${account.id}`, dbError instanceof Error ? dbError.stack : String(dbError));
+          throw dbError;
+        }
 
         this.logger.log(
           `📅 Video queued for @${username}: scheduled_for = ${queueRecord.scheduled_for}`,

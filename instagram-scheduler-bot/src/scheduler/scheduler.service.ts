@@ -43,8 +43,6 @@ export class SchedulerService {
         caption: caption || null,
         scheduled_for: scheduledForUtc,
         status: 'pending',
-        retry_count: 0,
-        error_message: null,
         slack_file_id: slackFileId || null,
       })
       .select()

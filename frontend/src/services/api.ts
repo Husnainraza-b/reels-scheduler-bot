@@ -40,10 +40,7 @@ export interface QueueItem {
   caption: string | null;
   scheduled_for: string;
   status: string;
-  retry_count: number;
-  error_message: string | null;
   slack_file_id: string | null;
-  published_at: string | null;
   created_at: string;
 }
 
