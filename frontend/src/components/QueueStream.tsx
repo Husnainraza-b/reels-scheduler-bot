@@ -4,15 +4,12 @@ import { format, formatDistanceToNow } from 'date-fns';
 import {
   CalendarClock,
   Video,
-  MessageSquareText,
   RefreshCw,
   Loader2,
-  Clock,
-  Zap,
   Pencil,
   Trash2,
-  Check,
-  X,
+  Film,
+  FileText,
 } from 'lucide-react';
 import type { QueueItem, Account } from '../services/api';
 import { updateQueueCaption, deleteQueueItem } from '../services/api';
@@ -28,38 +25,43 @@ const TIMEZONE = 'Asia/Karachi';
 
 const STATUS_CONFIG: Record<
   string,
-  { label: string; color: string; bgColor: string; icon: React.ReactNode }
+  { label: string; dotClass: string; badgeClass: string; isActive: boolean }
 > = {
   pending: {
-    label: 'Pending',
-    color: 'text-accent',
-    bgColor: 'bg-accent-muted',
-    icon: <Clock className="w-3.5 h-3.5" />,
+    label: 'Scheduled',
+    dotClass: 'bg-surface-high border-[3px] border-surface',
+    badgeClass: 'bg-surface-card text-text-secondary border border-outline/20',
+    isActive: false,
   },
   processing: {
-    label: 'Publishing',
-    color: 'text-warning',
-    bgColor: 'bg-warning/10',
-    icon: <Zap className="w-3.5 h-3.5" />,
+    label: 'Publishing Now',
+    dotClass: 'bg-accent border-[3px] border-surface timeline-dot-active animate-pulse',
+    badgeClass: 'bg-accent/10 text-accent border border-accent/20',
+    isActive: true,
   },
   rescheduling: {
     label: 'Rescheduling',
-    color: 'text-warning',
-    bgColor: 'bg-warning/10',
-    icon: <RefreshCw className="w-3.5 h-3.5" />,
+    dotClass: 'bg-warning border-[3px] border-surface animate-pulse',
+    badgeClass: 'bg-warning/10 text-warning border border-warning/20',
+    isActive: true,
   },
 };
 
 function formatPKT(utcTimestamp: string): string {
   const zonedDate = toZonedTime(new Date(utcTimestamp), TIMEZONE);
-  return format(zonedDate, 'EEE, MMM d · h:mm a');
+  return format(zonedDate, 'h:mm a');
+}
+
+function formatPKTFull(utcTimestamp: string): string {
+  const zonedDate = toZonedTime(new Date(utcTimestamp), TIMEZONE);
+  return format(zonedDate, 'EEE, MMM d');
 }
 
 function getTimeUntil(utcTimestamp: string): string {
   const target = new Date(utcTimestamp);
   const now = new Date();
   if (target <= now) return 'Due now';
-  return formatDistanceToNow(target, { addSuffix: true });
+  return `Due ${formatDistanceToNow(target, { addSuffix: true })}`;
 }
 
 function getAccountUsername(
@@ -129,98 +131,124 @@ export default function QueueStream({
   };
 
   return (
-    <div className="bg-surface-card rounded-2xl border border-border p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-muted flex items-center justify-center">
-            <CalendarClock className="w-5 h-5 text-accent" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">Live Queue</h2>
-            <p className="text-sm text-text-muted">
-              {localQueueItems.length} item{localQueueItems.length !== 1 ? 's' : ''} scheduled
-              <span className="ml-1 text-text-muted">· PKT timezone</span>
-            </p>
-          </div>
+    <div className="flex flex-col">
+      {/* ─── Queue Header ─── */}
+      <div className="flex items-end justify-between border-b border-outline/20 pb-4 mb-8">
+        <div>
+          <h1 className="text-3xl font-light text-text-primary tracking-tight">Live Queue</h1>
+          <p className="text-base text-text-secondary mt-1 flex items-center gap-2">
+            <span>{localQueueItems.length} items pending</span>
+            <span className="w-1 h-1 rounded-full bg-outline/50" />
+            <span className="font-mono text-sm opacity-70">PKT (UTC+5)</span>
+          </p>
         </div>
         <button
           onClick={onRefresh}
           disabled={isLoading}
-          className="p-2.5 bg-surface hover:bg-surface-hover border border-border rounded-xl transition-colors duration-200 cursor-pointer"
+          className="p-2 text-text-secondary hover:text-text-primary transition-colors cursor-pointer group"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 text-text-muted animate-spin" />
+            <Loader2 className="w-6 h-6 animate-spin" />
           ) : (
-            <RefreshCw className="w-4 h-4 text-text-secondary" />
+            <RefreshCw className="w-6 h-6 group-hover:rotate-180 transition-transform duration-700 ease-in-out" />
           )}
         </button>
       </div>
 
-      {/* Queue Items */}
+      {/* ─── Timeline Feed ─── */}
       {localQueueItems.length === 0 ? (
-        <div className="text-center py-12">
-          <CalendarClock className="w-12 h-12 text-text-muted mx-auto mb-3 opacity-40" />
-          <p className="text-sm text-text-muted">
+        <div className="text-center py-16">
+          <CalendarClock className="w-12 h-12 text-text-muted mx-auto mb-4 opacity-30" />
+          <p className="text-base text-text-muted">
             No items in the queue. Upload a video via Slack to get started.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {localQueueItems.map((item, index) => {
-            const statusCfg =
-              STATUS_CONFIG[item.status] || STATUS_CONFIG['pending'];
+        <div className="relative ml-4 pl-8 border-l border-outline/20 space-y-12 pb-12">
+          {localQueueItems.map((item) => {
+            const statusCfg = STATUS_CONFIG[item.status] || STATUS_CONFIG['pending'];
             const isDeleting = deletingId === item.id;
 
             return (
               <div
                 key={item.id}
-                className={`group relative flex items-start gap-4 p-4 bg-surface rounded-xl border border-border hover:border-border-focus/30 transition-all duration-200 ${
-                  isDeleting ? 'opacity-50 pointer-events-none scale-[0.98] border-danger/30 bg-danger/5' : ''
+                className={`group relative transition-all duration-200 ${
+                  isDeleting ? 'opacity-50 pointer-events-none scale-[0.98]' : ''
                 }`}
               >
-                {/* Index Badge */}
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-surface-hover flex items-center justify-center">
-                  <span className="text-xs font-bold text-text-muted">
-                    {index + 1}
-                  </span>
-                </div>
+                {/* Timeline Dot */}
+                <div className={`absolute -left-[37px] top-2 w-3 h-3 rounded-full ${statusCfg.dotClass}`} />
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {/* Status Badge */}
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${statusCfg.color} ${statusCfg.bgColor}`}
-                    >
-                      {statusCfg.icon}
-                      {statusCfg.label}
-                    </span>
-
-                    {/* Account */}
-                    <span className="text-xs text-text-muted">
-                      {getAccountUsername(item.account_id, accounts)}
-                    </span>
-                  </div>
-
-                  {/* Schedule Time */}
-                  <div className="flex items-center gap-2 mb-1">
-                    <CalendarClock className="w-3.5 h-3.5 text-accent" />
-                    <span className="text-sm font-medium text-text-primary">
+                {/* Header: Time + Status + Actions */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-baseline gap-3">
+                    <span className={`${statusCfg.isActive ? 'text-2xl font-normal text-text-primary' : 'text-xl text-text-secondary/80'}`}>
                       {formatPKT(item.scheduled_for)}
                     </span>
-                    <span className="text-xs text-text-muted">
-                      ({getTimeUntil(item.scheduled_for)})
+                    <span className={`text-xs px-2 py-0.5 rounded ${statusCfg.badgeClass}`}>
+                      {statusCfg.isActive ? statusCfg.label : getTimeUntil(item.scheduled_for)}
                     </span>
                   </div>
 
-                  {/* Caption Editing or Display */}
+                  {/* Hover Actions */}
+                  {item.status === 'pending' && editingId !== item.id && (
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <button
+                        onClick={() => handleEditClick(item)}
+                        disabled={isDeleting}
+                        className="text-text-secondary hover:text-text-primary cursor-pointer disabled:opacity-30"
+                        title="Edit Caption"
+                      >
+                        <Pencil className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item.id)}
+                        disabled={isDeleting}
+                        className="text-text-secondary hover:text-danger cursor-pointer disabled:opacity-30"
+                        title="Delete"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-danger" />
+                        ) : (
+                          <Trash2 className="w-5 h-5" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content Card */}
+                <div className={`bg-surface-lowest border border-outline/20 rounded-sm p-5 transition-all hover:border-outline/40 ${statusCfg.isActive ? 'hover:bg-surface-low/50' : ''}`}>
+                  {/* File Info */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded bg-surface-high flex items-center justify-center flex-shrink-0">
+                      <Film className="w-5 h-5 text-text-secondary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary font-mono truncate">
+                        {item.video_url.split('/').pop()}
+                      </p>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        {getAccountUsername(item.account_id, accounts)} · {formatPKTFull(item.scheduled_for)}
+                      </p>
+                    </div>
+                    <a
+                      href={item.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="ml-auto text-text-secondary hover:text-text-primary transition-colors flex-shrink-0"
+                    >
+                      <Video className="w-5 h-5" />
+                    </a>
+                  </div>
+
+                  {/* Caption: Edit Mode */}
                   {editingId === item.id ? (
-                    <div className="mt-2.5 space-y-2 bg-surface-card p-3 rounded-lg border border-border-focus/20">
+                    <div className="bg-surface/50 p-4 border-l-2 border-accent/30 rounded-r-sm space-y-3">
                       <textarea
                         value={editCaptionText}
                         onChange={(e) => setEditCaptionText(e.target.value)}
-                        className="w-full p-2 text-xs text-text-primary bg-surface border border-border rounded-lg focus:outline-none focus:border-border-focus resize-none"
+                        className="w-full p-0 text-base text-text-primary bg-transparent focus:outline-none focus:ring-0 resize-none border-none italic"
                         rows={3}
                         placeholder="Write a caption..."
                         disabled={isSavingCaption}
@@ -230,93 +258,54 @@ export default function QueueStream({
                         <button
                           onClick={handleCancelEdit}
                           disabled={isSavingCaption}
-                          className="px-2.5 py-1.5 bg-surface hover:bg-surface-hover border border-border rounded-md text-[10px] font-semibold text-text-secondary transition-colors duration-150 cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                          className="text-sm font-medium text-text-secondary hover:text-text-primary px-3 py-1 cursor-pointer disabled:opacity-50"
                         >
-                          <X className="w-3.5 h-3.5" />
                           Cancel
                         </button>
                         <button
                           onClick={() => handleSaveCaption(item.id)}
                           disabled={isSavingCaption}
-                          className="px-2.5 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-md text-[10px] font-semibold transition-colors duration-150 cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                          className="text-sm font-medium bg-accent text-surface px-4 py-1.5 rounded-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-2"
                         >
-                          {isSavingCaption ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Check className="w-3.5 h-3.5" />
-                          )}
+                          {isSavingCaption && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                           Save
                         </button>
                       </div>
                     </div>
                   ) : (
                     <>
-                      {/* Caption Display */}
+                      {/* Caption: Display */}
                       {item.caption ? (
-                        <div className="flex items-start gap-2 mt-1.5">
-                          <MessageSquareText className="w-3.5 h-3.5 text-text-muted mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-text-secondary line-clamp-2">
-                            {item.caption}
-                          </p>
-                        </div>
+                        <blockquote className="bg-surface/50 p-4 border-l-2 border-outline/30 text-base text-text-secondary italic rounded-r-sm leading-relaxed">
+                          "{item.caption}"
+                        </blockquote>
                       ) : (
                         item.status === 'pending' && (
-                          <div className="flex items-start gap-2 mt-1.5 opacity-40 hover:opacity-100 transition-opacity duration-150">
-                            <MessageSquareText className="w-3.5 h-3.5 text-text-muted mt-0.5 flex-shrink-0" />
-                            <button
-                              onClick={() => handleEditClick(item)}
-                              className="text-xs text-text-muted hover:text-text-secondary italic underline cursor-pointer bg-transparent border-none p-0"
-                            >
-                              Add caption...
-                            </button>
+                          <div
+                            onClick={() => handleEditClick(item)}
+                            className="bg-surface/30 p-4 border-l-2 border-dashed border-outline/20 text-base text-text-muted/50 italic rounded-r-sm cursor-pointer hover:bg-surface-card transition-colors flex items-center gap-2"
+                          >
+                            <FileText className="w-4 h-4" />
+                            + Add Caption
                           </div>
                         )
                       )}
                     </>
                   )}
-
-                  {/* Media URL */}
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <Video className="w-3.5 h-3.5 text-text-muted" />
-                    <a
-                      href={item.video_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-accent hover:text-accent-hover truncate max-w-xs transition-colors"
-                    >
-                      {item.video_url.split('/').pop()}
-                    </a>
-                  </div>
                 </div>
-
-                {/* Actions Panel */}
-                {item.status === 'pending' && editingId !== item.id && (
-                  <div className="flex-shrink-0 flex items-center gap-1.5 self-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button
-                      onClick={() => handleEditClick(item)}
-                      disabled={isDeleting}
-                      className="p-1.5 text-text-muted hover:text-accent hover:bg-accent/10 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-30"
-                      title="Edit Caption"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteItem(item.id)}
-                      disabled={isDeleting}
-                      className="p-1.5 text-text-muted hover:text-danger hover:bg-danger/10 rounded-lg transition-colors duration-150 cursor-pointer disabled:opacity-30"
-                      title="Delete Video"
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="w-4 h-4 text-danger animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                )}
               </div>
             );
           })}
+
+          {/* End of Queue Indicator */}
+          <div className="relative pt-4">
+            <div className="absolute -left-[33px] top-6 w-1 h-1 rounded-full bg-outline/30" />
+            <div className="absolute -left-[33px] top-10 w-1 h-1 rounded-full bg-outline/20" />
+            <div className="absolute -left-[33px] top-14 w-1 h-1 rounded-full bg-outline/10" />
+            <p className="text-xs font-semibold uppercase text-text-muted/40 tracking-widest pl-2">
+              End of scheduled queue
+            </p>
+          </div>
         </div>
       )}
     </div>

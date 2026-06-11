@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   Trash2,
   X,
-  Pencil
+  Pencil,
+  Settings
 } from 'lucide-react';
 import type { Account, PostingSlot } from '../services/api';
 import { createAccount, deleteAccount, updateAccount } from '../services/api';
@@ -23,7 +24,6 @@ interface AccountsPanelProps {
   slotsByAccount: Record<number, PostingSlot[]>;
   onSlotsChanged: () => void;
 }
-
 
 export default function AccountsPanel({
   accounts,
@@ -68,7 +68,7 @@ export default function AccountsPanel({
       setEditingAccountId(null);
       setSuccessMsg('Account updated successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
-      onAccountCreated(); // We reuse this to fetch accounts
+      onAccountCreated();
     } catch (err: any) {
       console.error('Failed to update account:', err);
       setErrorMsg(err.response?.data?.error || 'Failed to update account');
@@ -120,229 +120,286 @@ export default function AccountsPanel({
   };
 
   return (
-    <div className="bg-surface-card rounded-2xl border border-border p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-accent-muted flex items-center justify-center">
-            <Camera className="w-5 h-5 text-accent" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">Accounts</h2>
-            <p className="text-sm text-text-muted">{accounts.length} connected</p>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-xl transition-colors duration-200 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          Add
-        </button>
+    <div className="flex flex-col gap-4">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xs font-semibold uppercase text-text-secondary tracking-widest">
+          ACTIVE ROUTINES
+        </h2>
+        <span className="text-xs text-text-muted/50">{accounts.length} Total</span>
       </div>
 
       {/* Success Message */}
       {successMsg && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-success/10 border border-success/20 rounded-xl">
+        <div className="flex items-center gap-3 p-4 bg-success/10 border border-success/20 rounded-sm">
           <CheckCircle2 className="w-4 h-4 text-success" />
-          <span className="text-sm text-success">{successMsg}</span>
+          <span className="text-base text-success">{successMsg}</span>
         </div>
       )}
 
       {/* Error Message */}
       {errorMsg && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-danger/10 border border-danger/20 rounded-xl">
+        <div className="flex items-center gap-3 p-4 bg-danger/10 border border-danger/20 rounded-sm">
           <X className="w-4 h-4 text-danger" />
-          <span className="text-sm text-danger">{errorMsg}</span>
+          <span className="text-base text-danger">{errorMsg}</span>
         </div>
       )}
 
-      {/* Add Account Form */}
+      {/* Add Account Trigger */}
+      <button
+        onClick={() => setShowForm(!showForm)}
+        className="w-full py-4 border border-dashed border-outline/40 bg-transparent text-text-secondary text-sm font-medium rounded-sm hover:bg-surface-lowest hover:border-outline transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer group"
+      >
+        <UserPlus className="w-4 h-4 opacity-70 group-hover:opacity-100" />
+        New Routine Profile
+      </button>
+
+      {/* Inline Add Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="mb-6 p-4 bg-surface rounded-xl border border-border space-y-3">
-          <div className="relative">
-            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
+        <form onSubmit={handleSubmit} className="w-full p-5 border border-outline/20 bg-surface-lowest rounded-sm flex flex-col gap-4">
+          <div className="input-underline">
+            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+              <AtSign className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Profile Alias"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
+              />
+            </div>
           </div>
-          <div className="relative">
-            <Camera className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Meta Business ID"
-              value={businessId}
-              onChange={(e) => setBusinessId(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
+          <div className="input-underline">
+            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+              <Camera className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Meta Business ID"
+                value={businessId}
+                onChange={(e) => setBusinessId(e.target.value)}
+                className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
+              />
+            </div>
           </div>
-          <div className="relative">
-            <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="password"
-              placeholder="Access Token (will be encrypted)"
-              value={accessToken}
-              onChange={(e) => setAccessToken(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-focus transition-colors"
-            />
+          <div className="input-underline">
+            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+              <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+              <input
+                type="password"
+                placeholder="Access Token (encrypted)"
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
+              />
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex justify-end gap-2 mt-2">
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="flex-1 py-2.5 bg-surface-hover hover:bg-surface-hover/80 text-text-primary text-sm font-medium rounded-xl transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer border border-border"
+              className="text-sm font-medium text-text-secondary hover:text-text-primary px-3 py-1 cursor-pointer"
             >
-              <X className="w-4 h-4" />
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-[2] py-2.5 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors duration-200 flex items-center justify-center gap-2 cursor-pointer"
+              className="text-sm font-medium bg-accent text-surface px-4 py-1.5 rounded-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <KeyRound className="w-4 h-4" />
-              )}
-              {isSubmitting ? 'Saving...' : 'Encrypt & Save'}
+              {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Save
             </button>
           </div>
         </form>
       )}
 
-      {/* Account List */}
-      <div className="space-y-2">
+      {/* ─── Account Cards ─── */}
+
+      {/* Mobile: Horizontal scroll strip */}
+      <div className="flex md:hidden gap-4 overflow-x-auto hide-scrollbar pb-2 -mx-6 px-6">
+        {accounts.map((account) => {
+          const isActive = selectedAccountId === account.id;
+          const slots = slotsByAccount[account.id] || [];
+          return (
+            <button
+              key={account.id}
+              onClick={() => onSelectAccount(account.id)}
+              className={`flex-shrink-0 w-64 p-4 rounded-lg flex flex-col gap-2 text-left cursor-pointer transition-all ${
+                isActive
+                  ? 'bg-surface-card border-l-2 border-l-accent border-y border-r border-outline/10'
+                  : 'bg-surface-card border border-surface-hover'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <span className="text-sm font-medium text-text-primary">@{account.username}</span>
+                {isActive && <CheckCircle2 className="w-4 h-4 text-accent-hover" />}
+              </div>
+              <div className="flex gap-2 mt-2">
+                {slots.slice(0, 3).map((s) => (
+                  <span key={s.id} className="px-2 py-1 bg-surface-hover rounded-sm text-xs text-text-secondary">
+                    {s.slot_time.substring(0, 5)}
+                  </span>
+                ))}
+                {slots.length > 3 && (
+                  <span className="px-2 py-1 text-xs text-text-muted">+{slots.length - 3}</span>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Desktop: Vertical list */}
+      <div className="hidden md:flex flex-col gap-4">
         {accounts.length === 0 ? (
-          <p className="text-sm text-text-muted text-center py-8">
-            No accounts connected yet. Add your first Instagram account above.
+          <p className="text-base text-text-muted text-center py-8">
+            No accounts connected. Add your first routine above.
           </p>
         ) : (
-          accounts.map((account) => (
-            <div key={account.id} className="flex flex-col gap-2">
-              {editingAccountId === account.id ? (
-                <div className="p-4 bg-surface rounded-xl border border-accent/50 space-y-3">
-                  <div className="relative">
-                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                    <input
-                      type="text"
-                      placeholder="Username"
-                      value={editUsername}
-                      onChange={(e) => setEditUsername(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-border-focus"
-                    />
-                  </div>
-                  <div className="relative">
-                    <Camera className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                    <input
-                      type="text"
-                      placeholder="Meta Business ID"
-                      value={editBusinessId}
-                      onChange={(e) => setEditBusinessId(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-border-focus"
-                    />
-                  </div>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-                    <input
-                      type="password"
-                      placeholder="New Access Token (Leave blank to keep current)"
-                      value={editAccessToken}
-                      onChange={(e) => setEditAccessToken(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-surface-hover border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:border-border-focus"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setEditingAccountId(null)}
-                      className="flex-1 py-2 bg-surface-hover text-sm font-medium rounded-xl border border-border transition-colors cursor-pointer flex justify-center items-center gap-1"
-                    >
-                      <X className="w-4 h-4" /> Cancel
-                    </button>
-                    <button
-                      onClick={() => handleSaveAccountEdit(account.id)}
-                      disabled={isSavingEdit}
-                      className="flex-[2] py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors cursor-pointer flex justify-center items-center gap-1"
-                    >
-                      {isSavingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      Save Changes
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 text-left ${
-                    selectedAccountId === account.id
-                      ? 'bg-accent-muted border border-accent/30'
-                      : 'bg-surface hover:bg-surface-hover border border-transparent'
-                  }`}
-                >
-                  <button 
-                    onClick={() => onSelectAccount(account.id)}
-                    className="flex-1 flex items-center gap-3 cursor-pointer min-w-0 text-left"
-                  >
-                    <div
-                      className={`w-9 h-9 flex-shrink-0 rounded-lg flex items-center justify-center text-sm font-bold ${
-                        selectedAccountId === account.id
-                          ? 'bg-accent text-white'
-                          : 'bg-surface-hover text-text-secondary'
-                      }`}
-                    >
-                      {account.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-text-primary truncate">
-                        @{account.username}
-                      </p>
-                      <p className="text-xs text-text-muted truncate">
-                        ID: {account.instagram_business_id}
-                      </p>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={(e) => handleEditAccountClick(e, account)}
-                    className="p-2 hover:bg-accent/10 text-text-muted hover:text-accent rounded-lg transition-colors cursor-pointer"
-                    title="Edit Account"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
+          accounts.map((account) => {
+            const isActive = selectedAccountId === account.id;
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteAccount(account.id);
-                    }}
-                    disabled={deletingId === account.id}
-                    className="p-2 hover:bg-danger/10 text-text-muted hover:text-danger rounded-lg transition-colors cursor-pointer"
-                    title="Delete Account"
+            return (
+              <div key={account.id} className="flex flex-col">
+                {editingAccountId === account.id ? (
+                  /* ─── Edit Form ─── */
+                  <div className="p-5 bg-surface-lowest border border-outline/20 rounded-sm flex flex-col gap-4">
+                    <div className="input-underline">
+                      <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                        <AtSign className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                        <input
+                          type="text"
+                          placeholder="Username"
+                          value={editUsername}
+                          onChange={(e) => setEditUsername(e.target.value)}
+                          className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
+                        />
+                      </div>
+                    </div>
+                    <div className="input-underline">
+                      <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                        <Camera className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                        <input
+                          type="text"
+                          placeholder="Meta Business ID"
+                          value={editBusinessId}
+                          onChange={(e) => setEditBusinessId(e.target.value)}
+                          className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
+                        />
+                      </div>
+                    </div>
+                    <div className="input-underline">
+                      <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                        <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                        <input
+                          type="password"
+                          placeholder="New Token (leave blank to keep)"
+                          value={editAccessToken}
+                          onChange={(e) => setEditAccessToken(e.target.value)}
+                          className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingAccountId(null)}
+                        className="text-sm font-medium text-text-secondary hover:text-text-primary px-3 py-1 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => handleSaveAccountEdit(account.id)}
+                        disabled={isSavingEdit}
+                        className="text-sm font-medium bg-accent text-surface px-4 py-1.5 rounded-sm hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSavingEdit && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                        Save Changes
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ─── Account Card ─── */
+                  <div
+                    className={`group relative w-full p-5 flex flex-col gap-4 transition-all duration-300 cursor-pointer ${
+                      isActive
+                        ? 'bg-surface-low border-l-2 border-l-accent border-y border-r border-outline/10 rounded-r-sm hover:shadow-[0_0_30px_rgba(0,0,0,0.5)]'
+                        : 'bg-transparent border border-outline/10 rounded-sm hover:bg-surface-lowest hover:border-outline/30'
+                    }`}
+                    onClick={() => onSelectAccount(account.id)}
                   >
-                    {deletingId === account.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
+                    <div className={`flex items-start justify-between ${!isActive ? 'opacity-60 group-hover:opacity-100 transition-opacity' : ''}`}>
+                      <div>
+                        <h3 className={isActive ? 'text-2xl font-normal text-text-primary' : 'text-lg text-text-primary'}>
+                          @{account.username}
+                        </h3>
+                        <p className="text-xs text-text-secondary mt-1">
+                          ID: {account.instagram_business_id}
+                        </p>
+                      </div>
+
+                      {/* Hover Actions */}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        {isActive ? (
+                          <>
+                            <button
+                              onClick={(e) => handleEditAccountClick(e, account)}
+                              className="p-1.5 text-text-secondary hover:text-text-primary transition-colors rounded hover:bg-surface-high cursor-pointer"
+                              title="Edit"
+                            >
+                              <Pencil className="w-[18px] h-[18px]" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteAccount(account.id);
+                              }}
+                              disabled={deletingId === account.id}
+                              className="p-1.5 text-text-secondary hover:text-danger transition-colors rounded hover:bg-surface-high cursor-pointer"
+                              title="Delete"
+                            >
+                              {deletingId === account.id ? (
+                                <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                              ) : (
+                                <Trash2 className="w-[18px] h-[18px]" />
+                              )}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onSelectAccount(account.id); }}
+                            className="p-1.5 text-text-secondary hover:text-text-primary transition-colors rounded cursor-pointer"
+                          >
+                            <Settings className="w-[18px] h-[18px]" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Slots — only show on active */}
+                    {isActive && (
+                      <div className="pt-4 border-t border-outline/10">
+                        <SlotsConfigurator
+                          accountId={account.id}
+                          slots={slotsByAccount[account.id] || []}
+                          onSlotsChanged={onSlotsChanged}
+                        />
+                      </div>
                     )}
-                  </button>
-                  {selectedAccountId === account.id && (
-                    <div className="w-2 h-2 flex-shrink-0 rounded-full bg-accent status-pulse ml-1" />
-                  )}
-                </div>
-              )}
-              
-              <div className="pl-3 pr-3 pb-2 pt-1">
-                <SlotsConfigurator
-                  accountId={account.id}
-                  slots={slotsByAccount[account.id] || []}
-                  onSlotsChanged={onSlotsChanged}
-                />
+
+                    {/* Inactive: dot indicators for slots */}
+                    {!isActive && (slotsByAccount[account.id] || []).length > 0 && (
+                      <div className="flex gap-2 opacity-50 group-hover:opacity-80 transition-opacity">
+                        {(slotsByAccount[account.id] || []).map((_, i) => (
+                          <div key={i} className="w-1.5 h-1.5 rounded-full bg-outline" />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

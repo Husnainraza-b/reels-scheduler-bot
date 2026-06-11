@@ -2,22 +2,28 @@
 
 /* ─── Custom Design Tokens ─── */
 @theme {
-  --color-surface: #0f0f13;
-  --color-surface-card: #16161d;
-  --color-surface-hover: #1e1e28;
-  --color-border: #2a2a36;
-  --color-border-focus: #6366f1;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-accent-muted: rgba(99, 102, 241, 0.15);
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #8b8b9e;
-  --color-text-muted: #5a5a6e;
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --color-surface: #131315;
+  --color-surface-card: #201f22;
+  --color-surface-hover: #2a2a2c;
+  --color-surface-low: #1c1b1d;
+  --color-surface-lowest: #0e0e10;
+  --color-surface-high: #353437;
+  --color-border: #313032;
+  --color-border-focus: #979085;
+  --color-outline: #4b463d;
+  --color-accent: #f0e0c8;
+  --color-accent-hover: #d3c5ad;
+  --color-accent-muted: rgba(240, 224, 200, 0.15);
+  --color-danger: #ffb4ab;
+  --color-danger-hover: #ffdad6;
+  --color-success: #b0f0d6;
+  --color-warning: #f0e0c8;
+  --color-text-primary: #e5e1e4;
+  --color-text-secondary: #cec5ba;
+  --color-text-muted: #979085;
+  
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Geist', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* ─── Global Styles ─── */
@@ -35,6 +41,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+
 /* ─── Scrollbar ─── */
 ::-webkit-scrollbar {
   width: 6px;
@@ -50,12 +57,57 @@ body {
   background: var(--color-text-muted);
 }
 
-/* ─── Status Badge Pulse ─── */
+/* ─── Utilities ─── */
+.status-pulse {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
 
-.status-pulse {
-  animation: pulse-dot 2s ease-in-out infinite;
+.hairline-border {
+  border: 1px solid var(--color-border);
+}
+
+.soft-shadow {
+  box-shadow: 0 0 32px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Input Underline Animation ─── */
+.input-underline {
+  position: relative;
+}
+.input-underline::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 1px;
+  background-color: var(--color-accent);
+  transition: width 0.4s ease-in-out;
+}
+.input-underline:focus-within::after {
+  width: 100%;
+}
+
+/* ─── Dark Autofill Fix ─── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-text-primary) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* ─── Hide Scrollbar (Mobile horizontal scroll) ─── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Timeline Glow Dot ─── */
+.timeline-dot-active {
+  box-shadow: 0 0 10px rgba(240, 224, 200, 0.3);
 }
