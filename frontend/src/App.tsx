@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Zap, Radio, LogOut } from 'lucide-react';
 import LoginScreen from './components/LoginScreen';
 import AccountsPanel from './components/AccountsPanel';
-import SlotsConfigurator from './components/SlotsConfigurator';
 import QueueStream from './components/QueueStream';
 import {
   getAccounts,

@@ -1,6 +1,17 @@
-import { Controller, Get, Param, Logger, BadRequestException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Logger,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
+import { QueueService } from './queue.service';
 
 interface QueueItemResponse {
   id: number;
@@ -13,14 +24,17 @@ interface QueueItemResponse {
   created_at: string;
 }
 
-@Controller('dashboard/accounts')
+@Controller()
 @UseGuards(AdminAuthGuard)
 export class QueueController {
   private readonly logger = new Logger(QueueController.name);
 
-  constructor(private readonly supabaseService: SupabaseService) {}
+  constructor(
+    private readonly supabaseService: SupabaseService,
+    private readonly queueService: QueueService,
+  ) {}
 
-  @Get(':id/queue')
+  @Get('dashboard/accounts/:id/queue')
   async getQueue(@Param('id') accountId: string): Promise<QueueItemResponse[]> {
     const supabase = this.supabaseService.getClient();
 
@@ -39,7 +53,7 @@ export class QueueController {
     return (data || []) as QueueItemResponse[];
   }
 
-  @Get(':id/queue/all')
+  @Get('dashboard/accounts/:id/queue/all')
   async getFullQueue(@Param('id') accountId: string): Promise<QueueItemResponse[]> {
     const supabase = this.supabaseService.getClient();
 
@@ -55,5 +69,21 @@ export class QueueController {
     }
 
     return (data || []) as QueueItemResponse[];
+  }
+
+  @Patch('queue/:id/caption')
+  async editCaption(
+    @Param('id') id: string,
+    @Body() body: { caption: string },
+  ) {
+    if (body.caption === undefined) {
+      throw new BadRequestException('caption field is required in request body.');
+    }
+    return this.queueService.updateCaption(id, body.caption);
+  }
+
+  @Delete('queue/:id')
+  async deleteItem(@Param('id') id: string) {
+    return this.queueService.deleteAndReshuffle(id);
   }
 }

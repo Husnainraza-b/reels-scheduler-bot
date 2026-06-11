@@ -140,4 +140,13 @@ export async function getQueue(accountId: number): Promise<QueueItem[]> {
   return data;
 }
 
+export async function updateQueueCaption(id: number, caption: string): Promise<QueueItem> {
+  const { data } = await api.patch<QueueItem>(`/queue/${id}/caption`, { caption });
+  return data;
+}
+
+export async function deleteQueueItem(id: number): Promise<void> {
+  await api.delete(`/queue/${id}`);
+}
+
 export default api;

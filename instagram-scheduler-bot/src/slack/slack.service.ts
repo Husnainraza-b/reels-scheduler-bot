@@ -203,11 +203,17 @@ export class SlackService {
           `🗑️  Deleting file "${fileId}" from Slack workspace...`,
         );
 
-        await this.webClient.files.delete({ file: fileId });
-
-        this.logger.log(
-          `✅ File "${fileId}" deleted from Slack successfully.`,
-        );
+        try {
+          await this.webClient.files.delete({ file: fileId });
+          this.logger.log(
+            `✅ File "${fileId}" deleted from Slack successfully.`,
+          );
+        } catch (slackDeleteError) {
+          this.logger.warn(
+            `Could not delete file "${fileId}" from Slack workspace (likely due to human-authorship / missing scope limitations). Skipping deletion.`,
+            slackDeleteError instanceof Error ? slackDeleteError.message : String(slackDeleteError),
+          );
+        }
       } catch (error) {
         this.logger.error(
           `❌ Failed to process file "${fileId}" (${originalName}).`,
@@ -256,11 +262,12 @@ export class SlackService {
     username: string,
   ): Promise<{ id: number; username: string } | null> {
     const supabase = this.supabaseService.getClient();
+    const cleanUsername = username.startsWith('@') ? username.slice(1) : username;
 
     const { data, error } = await supabase
       .from('accounts')
       .select('id, username')
-      .eq('username', username)
+      .or(`username.eq.${cleanUsername},username.eq.@${cleanUsername}`)
       .single();
 
     if (error || !data) {
