@@ -82,6 +82,18 @@ export async function createAccount(payload: {
   return data;
 }
 
+export async function updateAccount(
+  id: number,
+  payload: {
+    username?: string;
+    instagram_business_id?: string;
+    access_token?: string;
+  }
+): Promise<Account> {
+  const { data } = await api.patch<Account>(`/dashboard/accounts/${id}`, payload);
+  return data;
+}
+
 export async function deleteAccount(id: number): Promise<void> {
   await api.delete(`/dashboard/accounts/${id}`);
 }
@@ -99,6 +111,17 @@ export async function createSlot(
 ): Promise<{ slot: PostingSlot; reshuffled: number; frozen: number }> {
   const { data } = await api.post<{ slot: PostingSlot; reshuffled: number; frozen: number }>(
     `/dashboard/accounts/${accountId}/slots`,
+    payload,
+  );
+  return data;
+}
+
+export async function updateSlot(
+  slotId: number,
+  payload: { slot_time: string },
+): Promise<{ slot: PostingSlot; reshuffled: number; frozen: number }> {
+  const { data } = await api.patch<{ slot: PostingSlot; reshuffled: number; frozen: number }>(
+    `/dashboard/slots/${slotId}`,
     payload,
   );
   return data;

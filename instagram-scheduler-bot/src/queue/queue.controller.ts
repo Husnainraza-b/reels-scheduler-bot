@@ -16,7 +16,7 @@ interface QueueItemResponse {
   created_at: string;
 }
 
-@Controller('api/dashboard/accounts')
+@Controller('dashboard/accounts')
 @UseGuards(AdminAuthGuard)
 export class QueueController {
   private readonly logger = new Logger(QueueController.name);

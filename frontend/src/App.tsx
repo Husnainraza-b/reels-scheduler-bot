@@ -21,10 +21,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // ─── Data State ───
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
-  const [slots, setSlots] = useState<PostingSlot[]>([]);
+  const [slotsByAccount, setSlotsByAccount] = useState<Record<number, PostingSlot[]>>({});
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [isQueueLoading, setIsQueueLoading] = useState(false);
 
@@ -61,13 +60,12 @@ export default function App() {
     return false;
   };
 
-  // ─── Logout Handler ───
   const handleLogout = () => {
     logout();
     setApiToken(null);
     setIsAuthenticated(false);
     setAccounts([]);
-    setSlots([]);
+    setSlotsByAccount({});
     setQueueItems([]);
     setSelectedAccountId(null);
   };
@@ -85,18 +83,18 @@ export default function App() {
     }
   }, [selectedAccountId]);
 
-  const fetchSlots = useCallback(async () => {
-    if (!selectedAccountId) {
-      setSlots([]);
-      return;
+  const fetchAllSlots = useCallback(async (accountsList: Account[]) => {
+    const newSlots: Record<number, PostingSlot[]> = {};
+    for (const acc of accountsList) {
+      try {
+        const data = await getSlots(acc.id);
+        newSlots[acc.id] = data;
+      } catch (err) {
+        console.error(`Failed to fetch slots for account ${acc.id}:`, err);
+      }
     }
-    try {
-      const data = await getSlots(selectedAccountId);
-      setSlots(data);
-    } catch (err) {
-      console.error('Failed to fetch slots:', err);
-    }
-  }, [selectedAccountId]);
+    setSlotsByAccount(newSlots);
+  }, []);
 
   const fetchQueue = useCallback(async () => {
     if (!selectedAccountId) {
@@ -114,22 +112,32 @@ export default function App() {
     }
   }, [selectedAccountId]);
 
-  // ─── Effects ───
   useEffect(() => {
     if (isAuthenticated) {
-      fetchAccounts();
+      fetchAccounts().then(() => {
+        // We'll fetch slots inside another effect that watches `accounts`
+      });
     }
   }, [isAuthenticated, fetchAccounts]);
 
   useEffect(() => {
+    if (isAuthenticated && accounts.length > 0) {
+      fetchAllSlots(accounts);
+    }
+  }, [isAuthenticated, accounts, fetchAllSlots]);
+
+  useEffect(() => {
     if (isAuthenticated && selectedAccountId) {
-      fetchSlots();
       fetchQueue();
     }
-  }, [selectedAccountId, isAuthenticated, fetchSlots, fetchQueue]);
+  }, [selectedAccountId, isAuthenticated, fetchQueue]);
 
   // ─── Event Handlers ───
   const handleAccountCreated = () => {
+    fetchAccounts();
+  };
+
+  const handleAccountDeleted = () => {
     fetchAccounts();
   };
 
@@ -138,7 +146,7 @@ export default function App() {
   };
 
   const handleSlotsChanged = () => {
-    fetchSlots();
+    fetchAllSlots(accounts);
     fetchQueue();
   };
 
@@ -205,15 +213,10 @@ export default function App() {
               selectedAccountId={selectedAccountId}
               onSelectAccount={handleSelectAccount}
               onAccountCreated={handleAccountCreated}
+              onAccountDeleted={handleAccountDeleted}
+              slotsByAccount={slotsByAccount}
+              onSlotsChanged={handleSlotsChanged}
             />
-
-            {selectedAccountId && (
-              <SlotsConfigurator
-                accountId={selectedAccountId}
-                slots={slots}
-                onSlotsChanged={handleSlotsChanged}
-              />
-            )}
           </div>
 
           {/* Right Column — Queue */}

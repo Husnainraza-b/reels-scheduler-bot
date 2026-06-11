@@ -2,7 +2,7 @@ import { Controller, Post, Headers, HttpCode, HttpStatus, ForbiddenException } f
 import { ConfigService } from '@nestjs/config';
 import { CronPublisherService } from './cron-publisher.service';
 
-@Controller('api/cron')
+@Controller('cron')
 export class PublisherController {
   private readonly cronSecret: string;
 

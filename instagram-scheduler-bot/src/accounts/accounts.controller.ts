@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -21,6 +22,12 @@ interface CreateAccountDto {
   access_token: string;
 }
 
+interface UpdateAccountDto {
+  username?: string;
+  instagram_business_id?: string;
+  access_token?: string;
+}
+
 interface AccountResponse {
   id: number;
   username: string;
@@ -28,7 +35,7 @@ interface AccountResponse {
   created_at: string;
 }
 
-@Controller('api/dashboard/accounts')
+@Controller('dashboard/accounts')
 @UseGuards(AdminAuthGuard)
 export class AccountsController {
   private readonly logger = new Logger(AccountsController.name);
@@ -106,5 +113,45 @@ export class AccountsController {
 
     this.logger.log(`🗑️  Account "${id}" deleted.`);
     return { deleted: true };
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  async updateAccount(
+    @Param('id') id: string,
+    @Body() body: UpdateAccountDto,
+  ): Promise<AccountResponse> {
+    const { username, instagram_business_id, access_token } = body;
+
+    const updates: Record<string, any> = {};
+    if (username !== undefined) updates.username = username;
+    if (instagram_business_id !== undefined) updates.instagram_business_id = instagram_business_id;
+
+    if (access_token) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
+      updates.encrypted_access_token = encryptedText;
+      updates.token_iv = iv;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      throw new BadRequestException({ error: 'No fields provided to update.', code: 'NO_UPDATES' });
+    }
+
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .update(updates)
+      .eq('id', id)
+      .select('id, username, instagram_business_id, created_at')
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to update account ${id}.`, error.message);
+      throw new BadRequestException({ error: `Failed to update account: ${error.message}`, code: 'UPDATE_FAILED' });
+    }
+
+    this.logger.log(`🔄 Account updated: "${data.username}" (${data.instagram_business_id})`);
+    return data as AccountResponse;
   }
 }
