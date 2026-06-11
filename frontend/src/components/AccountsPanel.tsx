@@ -215,42 +215,7 @@ export default function AccountsPanel({
       )}
 
       {/* ─── Account Cards ─── */}
-
-      {/* Mobile: Horizontal scroll strip */}
-      <div className="flex md:hidden gap-4 overflow-x-auto hide-scrollbar pb-2 -mx-6 px-6">
-        {accounts.map((account) => {
-          const isActive = selectedAccountId === account.id;
-          const slots = slotsByAccount[account.id] || [];
-          return (
-            <button
-              key={account.id}
-              onClick={() => onSelectAccount(account.id)}
-              className={`flex-shrink-0 w-64 p-4 rounded-lg flex flex-col gap-2 text-left cursor-pointer transition-all ${isActive
-                  ? 'bg-surface-card border-l-2 border-l-accent border-y border-r border-outline/10'
-                  : 'bg-surface-card border border-surface-hover'
-                }`}
-            >
-              <div className="flex justify-between items-start">
-                <span className="text-sm font-medium text-text-primary">@{account.username}</span>
-                {isActive && <CheckCircle2 className="w-4 h-4 text-accent-hover" />}
-              </div>
-              <div className="flex gap-2 mt-2">
-                {slots.slice(0, 3).map((s) => (
-                  <span key={s.id} className="px-2 py-1 bg-surface-hover rounded-sm text-xs text-text-secondary">
-                    {s.slot_time.substring(0, 5)}
-                  </span>
-                ))}
-                {slots.length > 3 && (
-                  <span className="px-2 py-1 text-xs text-text-muted">+{slots.length - 3}</span>
-                )}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Desktop: Vertical list */}
-      <div className="hidden md:flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
         {accounts.length === 0 ? (
           <p className="text-base text-text-muted text-center py-8">
             No accounts connected. Add your first routine above.
@@ -338,7 +303,7 @@ export default function AccountsPanel({
                       </div>
 
                       {/* Hover Actions */}
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                         {isActive ? (
                           <>
                             <button

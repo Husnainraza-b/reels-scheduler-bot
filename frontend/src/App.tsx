@@ -196,10 +196,10 @@ export default function App() {
 
       {/* ─── Main Canvas ─── */}
       <main className="py-12 min-h-screen">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 px-8 sm:px-12 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-8 sm:px-12 max-w-7xl mx-auto">
 
           {/* Left Column — Accounts */}
-          <div className="col-span-1 md:col-span-4 flex flex-col gap-4">
+          <div className="col-span-1 flex flex-col gap-4">
             <AccountsPanel
               accounts={accounts}
               selectedAccountId={selectedAccountId}
@@ -212,7 +212,7 @@ export default function App() {
           </div>
 
           {/* Right Column — Queue */}
-          <div className="col-span-1 md:col-span-8 md:pl-8">
+          <div className="col-span-1 lg:col-span-2 lg:pl-8">
             <QueueStream
               queueItems={queueItems}
               accounts={accounts}
