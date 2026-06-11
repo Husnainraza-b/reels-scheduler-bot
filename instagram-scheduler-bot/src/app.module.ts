@@ -1,0 +1,38 @@
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { envValidationSchema } from './config/env.validation';
+import { CryptoModule } from './crypto/crypto.module';
+import { DatabaseModule } from './database/database.module';
+import { StorageModule } from './storage/storage.module';
+import { SlackModule } from './slack/slack.module';
+import { QueueModule } from './queue/queue.module';
+import { PublisherModule } from './publisher/publisher.module';
+import { AuthModule } from './auth/auth.module';
+import { AccountsModule } from './accounts/accounts.module';
+import { SlotsModule } from './slots/slots.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
+
+@Module({
+  imports: [
+    // Loads .env and makes ConfigService available globally
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validationSchema: envValidationSchema,
+    }),
+    CryptoModule,
+    DatabaseModule,
+    StorageModule,
+    SlackModule,
+    QueueModule,
+    PublisherModule,
+    AuthModule,
+    AccountsModule,
+    SlotsModule,
+    SchedulerModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}

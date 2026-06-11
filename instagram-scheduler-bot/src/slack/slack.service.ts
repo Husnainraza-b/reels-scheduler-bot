@@ -1,0 +1,271 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { WebClient } from '@slack/web-api';
+import axios from 'axios';
+import { Readable } from 'stream';
+import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
+import { SupabaseService } from '../database/supabase.service';
+import { SchedulerService } from '../scheduler/scheduler.service';
+
+/**
+ * Processes incoming Slack file uploads with Tenant Routing:
+ * 1. Parses the @username from the caption to determine which account.
+ * 2. Validates the account exists in the database.
+ * 3. Downloads the file from Slack as a stream.
+ * 4. Pipes the stream directly to Cloudflare R2.
+ * 5. Adds the video to the posting queue via the Gap Finder engine.
+ * 6. Deletes the original file from the Slack workspace.
+ */
+@Injectable()
+export class SlackService {
+  private readonly logger = new Logger(SlackService.name);
+  private readonly webClient: WebClient;
+  private readonly botToken: string;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cloudflareR2Service: CloudflareR2Service,
+    private readonly supabaseService: SupabaseService,
+    private readonly schedulerService: SchedulerService,
+  ) {
+    const token = this.configService.get<string>('SLACK_BOT_TOKEN');
+
+    if (!token) {
+      throw new Error(
+        'CRITICAL: SLACK_BOT_TOKEN is missing from environment variables.',
+      );
+    }
+
+    this.botToken = token;
+    this.webClient = new WebClient(this.botToken);
+
+    this.logger.log('Slack WebClient initialized successfully.');
+  }
+
+  /**
+   * Full file lifecycle with Tenant Routing:
+   * Parse @username → Validate account → Download → Stream to R2 → Queue → Delete
+   *
+   * @param event - The Slack message event containing file attachments.
+   */
+  async processIncomingFile(event: {
+    text?: string;
+    files?: Array<{
+      id: string;
+      url_private_download: string;
+      mimetype: string;
+      name: string;
+    }>;
+    channel: string;
+    user: string;
+  }): Promise<void> {
+    if (!event.files || event.files.length === 0) {
+      this.logger.warn('processIncomingFile called with no files. Skipping.');
+      return;
+    }
+
+    // --- Step 1: Parse @username from caption ---
+    const rawCaption = event.text?.trim() || '';
+    const { username, caption } = this.parseCaption(rawCaption);
+
+    if (!username) {
+      this.logger.warn(
+        `No @username found in caption: "${rawCaption}". Alerting user.`,
+      );
+      await this.sendSlackError(
+        event.channel,
+        event.user,
+        '❌ *Error:* Please specify a valid account username at the start of your caption.\n\n' +
+          'Format: `@username Your caption here`\n' +
+          'Example: `@football_edits Here is the new reel!`',
+      );
+      return;
+    }
+
+    // --- Step 2: Validate the account exists in the database ---
+    const account = await this.lookupAccount(username);
+
+    if (!account) {
+      this.logger.warn(
+        `Account "@${username}" not found in database. Alerting user.`,
+      );
+      await this.sendSlackError(
+        event.channel,
+        event.user,
+        `❌ *Error:* Account \`@${username}\` was not found in the system.\n\n` +
+          'Please check the username and try again, or add the account via the dashboard first.',
+      );
+      return;
+    }
+
+    this.logger.log(
+      `🎯 Tenant routed: @${username} → account_id: ${account.id}`,
+    );
+
+    // --- Step 3: Process each file ---
+    for (const file of event.files) {
+      const fileId = file.id;
+      const downloadUrl = file.url_private_download;
+      const originalName = file.name || 'video.mp4';
+      const mimetype = file.mimetype || '';
+
+      // Non-video file rejection
+      if (!mimetype.startsWith('video/')) {
+        this.logger.warn(`Non-video file uploaded: ${mimetype}. Alerting user.`);
+        await this.sendSlackError(
+          event.channel,
+          event.user,
+          `❌ *Error:* Only video files are accepted.\n` +
+            `You uploaded: \`${originalName}\` (${mimetype})`,
+        );
+        continue;
+      }
+
+      // Generate a unique filename to avoid collisions in R2
+      const extension = originalName.split('.').pop() || 'mp4';
+      const uniqueFileName = `${Date.now()}-${fileId}.${extension}`;
+
+      this.logger.log(
+        `📥 Downloading file "${originalName}" (ID: ${fileId}) from Slack...`,
+      );
+
+      try {
+        // --- Download from Slack as a stream ---
+        const response = await axios.get<Readable>(downloadUrl, {
+          responseType: 'stream',
+          headers: {
+            Authorization: `Bearer ${this.botToken}`,
+          },
+        });
+
+        const fileStream: Readable = response.data;
+
+        // --- Stream directly to Cloudflare R2 ---
+        this.logger.log(
+          `☁️  Streaming "${uniqueFileName}" to Cloudflare R2...`,
+        );
+
+        const publicUrl = await this.cloudflareR2Service.uploadVideo(
+          fileStream,
+          uniqueFileName,
+        );
+
+        this.logger.log(
+          `✅ Upload complete. Public URL: ${publicUrl}`,
+        );
+
+        // --- Add to queue via Gap Finder engine ---
+        const queueRecord = await this.schedulerService.addToQueue(
+          account.id,
+          publicUrl,
+          caption,
+          fileId,
+        );
+
+        this.logger.log(
+          `📅 Video queued for @${username}: scheduled_for = ${queueRecord.scheduled_for}`,
+        );
+
+        // --- Send confirmation to Slack ---
+        await this.webClient.chat.postMessage({
+          channel: event.channel,
+          text:
+            `✅ *Video queued for @${username}!*\n\n` +
+            `📅 Scheduled: ${queueRecord.scheduled_for}\n` +
+            `📝 Caption: ${caption || '(none)'}\n` +
+            `🎬 File: \`${uniqueFileName}\``,
+        });
+
+        // --- Delete the original file from Slack workspace ---
+        this.logger.log(
+          `🗑️  Deleting file "${fileId}" from Slack workspace...`,
+        );
+
+        await this.webClient.files.delete({ file: fileId });
+
+        this.logger.log(
+          `✅ File "${fileId}" deleted from Slack successfully.`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `❌ Failed to process file "${fileId}" (${originalName}).`,
+          error instanceof Error ? error.stack : String(error),
+        );
+
+        await this.sendSlackError(
+          event.channel,
+          event.user,
+          `❌ *Error processing file:* \`${originalName}\`\n\n` +
+            `\`${error instanceof Error ? error.message : String(error)}\``,
+        );
+      }
+    }
+  }
+
+  /**
+   * Parses the @username from the beginning of a caption.
+   *
+   * Input:  "@football_edits Here is the new reel!"
+   * Output: { username: "football_edits", caption: "Here is the new reel!" }
+   *
+   * Input:  "No username here"
+   * Output: { username: null, caption: "No username here" }
+   */
+  private parseCaption(text: string): {
+    username: string | null;
+    caption: string;
+  } {
+    const match = text.match(/^@(\S+)\s*([\s\S]*)$/);
+
+    if (!match) {
+      return { username: null, caption: text };
+    }
+
+    return {
+      username: match[1],
+      caption: match[2]?.trim() || '',
+    };
+  }
+
+  /**
+   * Looks up an account by username in the database.
+   */
+  private async lookupAccount(
+    username: string,
+  ): Promise<{ id: number; username: string } | null> {
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('id, username')
+      .eq('username', username)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data as { id: number; username: string };
+  }
+
+  /**
+   * Sends an error message to a Slack channel, mentioning the user.
+   */
+  private async sendSlackError(
+    channel: string,
+    userId: string,
+    message: string,
+  ): Promise<void> {
+    try {
+      await this.webClient.chat.postMessage({
+        channel,
+        text: `<@${userId}> ${message}`,
+      });
+    } catch (err) {
+      this.logger.error(
+        'Failed to send error message to Slack.',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+}
