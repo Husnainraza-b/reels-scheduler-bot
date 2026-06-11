@@ -15,6 +15,7 @@ import {
 import { SupabaseService } from '../database/supabase.service';
 import { EncryptionService } from '../crypto/encryption.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
+import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
 
 interface CreateAccountDto {
   username: string;
@@ -43,6 +44,7 @@ export class AccountsController {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly encryptionService: EncryptionService,
+    private readonly cloudflareR2Service: CloudflareR2Service,
   ) {}
 
   @Get()
@@ -69,7 +71,12 @@ export class AccountsController {
   ): Promise<AccountResponse> {
     const { username, instagram_business_id, access_token } = body;
 
-    if (!username || !instagram_business_id || !access_token) {
+    let cleanUsername = username;
+    if (cleanUsername && cleanUsername.startsWith('@')) {
+      cleanUsername = cleanUsername.substring(1);
+    }
+
+    if (!cleanUsername || !instagram_business_id || !access_token) {
       throw new BadRequestException({ error: 'username, instagram_business_id, and access_token are all required.', code: 'MISSING_FIELDS' });
     }
 
@@ -79,7 +86,7 @@ export class AccountsController {
     const { data, error } = await supabase
       .from('accounts')
       .insert({
-        username,
+        username: cleanUsername,
         instagram_business_id,
         access_token: `${iv}:${encryptedText}`,
       })
@@ -91,7 +98,7 @@ export class AccountsController {
       throw new BadRequestException({ error: `Failed to create account: ${error.message}`, code: 'CREATE_FAILED' });
     }
 
-    this.logger.log(`✅ Account created: "${username}" (${instagram_business_id})`);
+    this.logger.log(`✅ Account created: "${cleanUsername}" (${instagram_business_id})`);
     return data as AccountResponse;
   }
 
@@ -100,6 +107,31 @@ export class AccountsController {
   async deleteAccount(@Param('id') id: string) {
     const supabase = this.supabaseService.getClient();
 
+    // 1. Fetch all queue items for this account to delete their videos from R2
+    const { data: queueItems, error: fetchError } = await supabase
+      .from('queue')
+      .select('video_url')
+      .eq('account_id', id);
+
+    if (fetchError) {
+      this.logger.warn(`Failed to fetch queue items for account ${id} before deletion. R2 videos might be orphaned.`, fetchError.message);
+    } else if (queueItems && queueItems.length > 0) {
+      this.logger.log(`Found ${queueItems.length} queued videos for account ${id}. Deleting from R2...`);
+      for (const item of queueItems) {
+        if (item.video_url) {
+          const fileName = item.video_url.split('/').pop();
+          if (fileName) {
+            try {
+              await this.cloudflareR2Service.deleteVideo(fileName);
+            } catch (err) {
+              this.logger.warn(`Could not delete video ${fileName} from R2 during account deletion. Skipping.`, err);
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Delete the account (which cascade-deletes the queue rows)
     const { error } = await supabase
       .from('accounts')
       .delete()
@@ -110,7 +142,7 @@ export class AccountsController {
       throw new BadRequestException({ error: `Failed to delete account: ${error.message}`, code: 'DELETE_FAILED' });
     }
 
-    this.logger.log(`🗑️  Account "${id}" deleted.`);
+    this.logger.log(`🗑️  Account "${id}" and all associated videos deleted.`);
     return { deleted: true };
   }
 
@@ -123,7 +155,9 @@ export class AccountsController {
     const { username, instagram_business_id, access_token } = body;
 
     const updates: Record<string, any> = {};
-    if (username !== undefined) updates.username = username;
+    if (username !== undefined) {
+      updates.username = username.startsWith('@') ? username.substring(1) : username;
+    }
     if (instagram_business_id !== undefined) updates.instagram_business_id = instagram_business_id;
 
     if (access_token) {

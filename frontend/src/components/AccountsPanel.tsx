@@ -42,6 +42,7 @@ export default function AccountsPanel({
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<number | null>(null);
 
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [editUsername, setEditUsername] = useState('');
@@ -77,9 +78,9 @@ export default function AccountsPanel({
     }
   };
 
-  const handleDeleteAccount = async (id: number) => {
-    if (!window.confirm("Are you sure you want to delete this account?")) return;
+  const handleDeleteAccountConfirm = async (id: number) => {
     setDeletingId(id);
+    setAccountToDelete(null);
     setErrorMsg('');
     try {
       await deleteAccount(id);
@@ -88,7 +89,7 @@ export default function AccountsPanel({
       console.error('Failed to delete account:', err);
       setErrorMsg(err.response?.data?.error || 'Failed to delete account');
     } finally {
-      setDeletingId(null);
+      setDeletingId((prev) => (prev === id ? null : prev));
     }
   };
 
@@ -224,11 +225,10 @@ export default function AccountsPanel({
             <button
               key={account.id}
               onClick={() => onSelectAccount(account.id)}
-              className={`flex-shrink-0 w-64 p-4 rounded-lg flex flex-col gap-2 text-left cursor-pointer transition-all ${
-                isActive
+              className={`flex-shrink-0 w-64 p-4 rounded-lg flex flex-col gap-2 text-left cursor-pointer transition-all ${isActive
                   ? 'bg-surface-card border-l-2 border-l-accent border-y border-r border-outline/10'
                   : 'bg-surface-card border border-surface-hover'
-              }`}
+                }`}
             >
               <div className="flex justify-between items-start">
                 <span className="text-sm font-medium text-text-primary">@{account.username}</span>
@@ -321,11 +321,10 @@ export default function AccountsPanel({
                 ) : (
                   /* ─── Account Card ─── */
                   <div
-                    className={`group relative w-full p-5 flex flex-col gap-4 transition-all duration-300 cursor-pointer ${
-                      isActive
+                    className={`group relative w-full p-5 flex flex-col gap-4 transition-all duration-300 cursor-pointer ${isActive
                         ? 'bg-surface-low border-l-2 border-l-accent border-y border-r border-outline/10 rounded-r-sm hover:shadow-[0_0_30px_rgba(0,0,0,0.5)]'
                         : 'bg-transparent border border-outline/10 rounded-sm hover:bg-surface-lowest hover:border-outline/30'
-                    }`}
+                      }`}
                     onClick={() => onSelectAccount(account.id)}
                   >
                     <div className={`flex items-start justify-between ${!isActive ? 'opacity-60 group-hover:opacity-100 transition-opacity' : ''}`}>
@@ -352,14 +351,14 @@ export default function AccountsPanel({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDeleteAccount(account.id);
+                                setAccountToDelete(account.id);
                               }}
                               disabled={deletingId === account.id}
                               className="p-1.5 text-text-secondary hover:text-danger transition-colors rounded hover:bg-surface-high cursor-pointer"
                               title="Delete"
                             >
                               {deletingId === account.id ? (
-                                <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                                <Loader2 className="w-[18px] h-[18px] animate-spin text-danger" />
                               ) : (
                                 <Trash2 className="w-[18px] h-[18px]" />
                               )}
@@ -402,6 +401,39 @@ export default function AccountsPanel({
           })
         )}
       </div>
+
+      {/* ─── Delete Confirmation Modal ─── */}
+      {accountToDelete !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl max-w-md w-full p-6 space-y-6 transform transition-all">
+            <div>
+              <h2 className="text-lg font-medium text-zinc-100 mb-2">
+                Delete Account
+              </h2>
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Are you absolutely sure? Deleting this account will permanently remove the account, its access tokens, and ALL scheduled videos associated with it from the queue and storage. This cannot be undone.
+              </p>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800/50">
+              <button
+                onClick={() => setAccountToDelete(null)}
+                disabled={deletingId !== null}
+                className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteAccountConfirm(accountToDelete)}
+                disabled={deletingId !== null}
+                className="px-4 py-2 text-sm font-medium bg-red-900/20 text-red-400 border border-red-900/50 hover:bg-red-900/40 rounded-lg transition-colors cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {deletingId !== null && <Loader2 className="w-4 h-4 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

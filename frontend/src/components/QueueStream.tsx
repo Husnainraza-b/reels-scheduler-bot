@@ -82,7 +82,19 @@ export default function QueueStream({
   const [editCaptionText, setEditCaptionText] = useState<string>('');
   const [isSavingCaption, setIsSavingCaption] = useState<boolean>(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [isConfirmLocked, setIsConfirmLocked] = useState<boolean>(false);
   const [localQueueItems, setLocalQueueItems] = useState<QueueItem[]>(queueItems);
+
+  useEffect(() => {
+    if (pendingDeleteId !== null) {
+      setIsConfirmLocked(true);
+      const timer = setTimeout(() => {
+        setIsConfirmLocked(false);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingDeleteId]);
 
   useEffect(() => {
     setLocalQueueItems(queueItems);
@@ -114,11 +126,24 @@ export default function QueueStream({
     }
   };
 
-  const handleDeleteItem = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this video? This cannot be undone.')) {
-      return;
-    }
+  const handleDeleteClick = (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPendingDeleteId(id);
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPendingDeleteId(null);
+  };
+
+  const handleConfirmDelete = async (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     setDeletingId(id);
+    setPendingDeleteId(null);
     try {
       await deleteQueueItem(id);
       onRefresh();
@@ -126,7 +151,7 @@ export default function QueueStream({
       console.error('Failed to delete item:', err);
       alert('Failed to delete video. Please try again.');
     } finally {
-      setDeletingId(null);
+      setDeletingId((prev) => (prev === id ? null : prev));
     }
   };
 
@@ -192,27 +217,54 @@ export default function QueueStream({
 
                   {/* Hover Actions */}
                   {item.status === 'pending' && editingId !== item.id && (
-                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button
-                        onClick={() => handleEditClick(item)}
-                        disabled={isDeleting}
-                        className="text-text-secondary hover:text-text-primary cursor-pointer disabled:opacity-30"
-                        title="Edit Caption"
-                      >
-                        <Pencil className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        disabled={isDeleting}
-                        className="text-text-secondary hover:text-danger cursor-pointer disabled:opacity-30"
-                        title="Delete"
-                      >
-                        {isDeleting ? (
-                          <Loader2 className="w-5 h-5 animate-spin text-danger" />
-                        ) : (
-                          <Trash2 className="w-5 h-5" />
-                        )}
-                      </button>
+                    <div className={`flex items-center gap-2 transition-opacity duration-300 ${pendingDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                      {pendingDeleteId === item.id ? (
+                        <div className="flex items-center gap-3 bg-surface-card px-3 py-1 rounded border border-danger/30">
+                          <span className="text-xs text-text-secondary">Delete?</span>
+                          <button
+                            onClick={(e) => {
+                              if (!isConfirmLocked) handleConfirmDelete(e, item.id);
+                            }}
+                            disabled={isConfirmLocked}
+                            className={`text-xs font-medium transition-colors ${
+                              isConfirmLocked 
+                                ? 'text-danger/30 cursor-not-allowed' 
+                                : 'text-danger hover:text-danger/80 cursor-pointer'
+                            }`}
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={(e) => handleCancelDelete(e)}
+                            className="text-xs font-medium text-text-secondary hover:text-text-primary cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleEditClick(item)}
+                            disabled={isDeleting}
+                            className="text-text-secondary hover:text-text-primary cursor-pointer disabled:opacity-30"
+                            title="Edit Caption"
+                          >
+                            <Pencil className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteClick(e, item.id)}
+                            disabled={isDeleting}
+                            className="text-text-secondary hover:text-danger cursor-pointer disabled:opacity-30"
+                            title="Delete"
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="w-5 h-5 animate-spin text-danger" />
+                            ) : (
+                              <Trash2 className="w-5 h-5" />
+                            )}
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
