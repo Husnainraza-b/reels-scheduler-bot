@@ -1,6 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
+import { SchedulerService } from '../scheduler/scheduler.service';
 
 @Injectable()
 export class QueueService {
@@ -9,6 +10,7 @@ export class QueueService {
   constructor(
     private readonly supabaseService: SupabaseService,
     private readonly cloudflareR2Service: CloudflareR2Service,
+    private readonly schedulerService: SchedulerService,
   ) {}
 
   /**
@@ -41,13 +43,21 @@ export class QueueService {
     // 1. Target: Fetch the video record from Supabase
     const { data: item, error: fetchError } = await supabase
       .from('queue')
-      .select('account_id, video_url')
+      .select('account_id, video_url, status')
       .eq('id', id)
       .single();
 
     if (fetchError || !item) {
       this.logger.error(`Queue item #${id} not found for deletion. Error: ${fetchError?.message}`);
       throw new NotFoundException(`Queue item #${id} not found.`);
+    }
+
+    // Guard: cannot delete an item that is actively being published
+    if (item.status === 'processing') {
+      throw new BadRequestException({
+        error: 'Cannot delete a video that is currently being published. Wait a minute and try again.',
+        code: 'ITEM_IS_PROCESSING',
+      });
     }
 
     const { account_id: accountId, video_url: videoUrl } = item;
@@ -78,69 +88,11 @@ export class QueueService {
     }
     this.logger.log(`✅ Queue item #${id} deleted from database.`);
 
-    // 4. The Reshuffle: fetch remaining pending videos for that account ordered by scheduled_for ASC
-    const { data: remainingItems, error: queryError } = await supabase
-      .from('queue')
-      .select('id')
-      .eq('account_id', accountId)
-      .eq('status', 'pending')
-      .order('scheduled_for', { ascending: true });
-
-    if (queryError) {
-      this.logger.error(`Failed to query remaining queue items for account ${accountId}: ${queryError.message}`);
-      throw new BadRequestException(`Failed to query remaining items: ${queryError.message}`);
-    }
-
-    if (remainingItems && remainingItems.length > 0) {
-      const remainingIds = remainingItems.map(x => x.id);
-
-      // Temporarily mark status to 'rescheduling' so Gap Finder RPC calculate_next_slot ignores their slots
-      const { error: markError } = await supabase
-        .from('queue')
-        .update({ status: 'rescheduling' })
-        .in('id', remainingIds);
-
-      if (markError) {
-        this.logger.error(`Failed to temporarily update items to rescheduling: ${markError.message}`);
-        throw new BadRequestException(`Reshuffle failed during status preparation: ${markError.message}`);
-      }
-
-      for (const remainingItem of remainingItems) {
-        try {
-          // Calculate new earliest slot
-          const { data: newSlot, error: rpcError } = await supabase
-            .rpc('calculate_next_slot', { p_account_id: accountId });
-
-          if (rpcError || !newSlot) {
-            throw new Error(rpcError?.message || 'Gap Finder returned empty/null slot.');
-          }
-
-          // Update item to new slot and change status back to pending
-          const { error: updateError } = await supabase
-            .from('queue')
-            .update({
-              scheduled_for: newSlot,
-              status: 'pending',
-            })
-            .eq('id', remainingItem.id);
-
-          if (updateError) {
-            throw new Error(`Failed to update scheduled_for: ${updateError.message}`);
-          }
-
-          this.logger.log(`🔄 Reshuffled video #${remainingItem.id} to new slot: ${newSlot}`);
-        } catch (reshuffleError) {
-          this.logger.error(
-            `Failed to reshuffle video #${remainingItem.id}. Restoring status to pending.`,
-            reshuffleError instanceof Error ? reshuffleError.stack : String(reshuffleError),
-          );
-          // Fallback recovery: reset status back to pending
-          await supabase
-            .from('queue')
-            .update({ status: 'pending' })
-            .eq('id', remainingItem.id);
-        }
-      }
+    // 4. The Reshuffle: delegate to SchedulerService's strict Lift and Restack logic
+    try {
+      await this.schedulerService.reshuffleQueue(accountId);
+    } catch (reshuffleError) {
+      this.logger.warn(`Queue reshuffle failed after deleting item #${id}.`, reshuffleError instanceof Error ? reshuffleError.message : String(reshuffleError));
     }
 
     return { success: true };

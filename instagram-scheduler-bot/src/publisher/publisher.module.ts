@@ -4,9 +4,10 @@ import { CronPublisherService } from './cron-publisher.service';
 import { DatabaseModule } from '../database/database.module';
 import { CryptoModule } from '../crypto/crypto.module';
 import { StorageModule } from '../storage/storage.module';
+import { SchedulerModule } from '../scheduler/scheduler.module';
 
 @Module({
-  imports: [DatabaseModule, CryptoModule, StorageModule],
+  imports: [DatabaseModule, CryptoModule, StorageModule, SchedulerModule],
   controllers: [PublisherController],
   providers: [CronPublisherService],
 })

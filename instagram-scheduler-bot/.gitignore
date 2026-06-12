@@ -18,3 +18,10 @@ Thumbs.db
 # Build
 *.js.map
 *.d.ts
+
+# Runtime logs — never commit these
+*.log
+ngrok.log
+lt.log
+ngrok_check.log
+ngrok_config.log

@@ -80,6 +80,13 @@ export class AccountsController {
       throw new BadRequestException({ error: 'username, instagram_business_id, and access_token are all required.', code: 'MISSING_FIELDS' });
     }
 
+    if (!access_token.trim()) {
+      throw new BadRequestException({
+        error: 'access_token cannot be blank or whitespace.',
+        code: 'INVALID_TOKEN',
+      });
+    }
+
     const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
     const supabase = this.supabaseService.getClient();
 

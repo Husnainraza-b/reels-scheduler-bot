@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { envValidationSchema } from './config/env.validation';
@@ -21,6 +22,11 @@ import { SchedulerModule } from './scheduler/scheduler.module';
       isGlobal: true,
       validationSchema: envValidationSchema,
     }),
+    // Global rate limiting configuration
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 10,
+    }]),
     CryptoModule,
     DatabaseModule,
     StorageModule,

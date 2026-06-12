@@ -18,6 +18,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Response interceptor — redirect to login on expired/invalid session
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      currentToken = null;
+      // Force navigation to login screen
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
+    return Promise.reject(error);
+  },
+);
+
 // ─── Types (aligned to actual DB schema) ───
 
 export interface Account {

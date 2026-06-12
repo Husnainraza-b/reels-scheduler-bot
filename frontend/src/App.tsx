@@ -129,6 +129,13 @@ export default function App() {
     }
   }, [selectedAccountId, isAuthenticated, fetchQueue]);
 
+  // Auto-refresh queue every 30 seconds so statuses update without manual refresh
+  useEffect(() => {
+    if (!isAuthenticated || !selectedAccountId) return;
+    const interval = setInterval(fetchQueue, 30_000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, selectedAccountId, fetchQueue]);
+
   // ─── Event Handlers ───
   const handleAccountCreated = () => {
     fetchAccounts();

@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 
-const FREEZE_GUARD_MINUTES = 15;
 
 @Injectable()
 export class SchedulerService {
@@ -62,13 +61,12 @@ export class SchedulerService {
   }
 
   /**
-   * Reshuffles all pending queue items outside the freeze guard window.
+   * Reshuffles all pending queue items using the strict Lift and Restack logic.
    */
   async reshuffleQueue(accountId: number | string): Promise<{ reshuffled: number; frozen: number }> {
     const supabase = this.supabaseService.getClient();
-    const now = new Date();
-    const freezeBarrier = new Date(now.getTime() + FREEZE_GUARD_MINUTES * 60 * 1000);
 
+    // 1. Fetch: Retrieve all videos for the account where status = 'pending', strictly ordered by created_at ASC
     const { data: pendingItems, error: fetchError } = await supabase
       .from('queue')
       .select('*')
@@ -85,27 +83,22 @@ export class SchedulerService {
       return { reshuffled: 0, frozen: 0 };
     }
 
-    const frozenItems = pendingItems.filter((item) => new Date(item.scheduled_for) <= freezeBarrier);
-    const shiftableItems = pendingItems.filter((item) => new Date(item.scheduled_for) > freezeBarrier);
-
-    frozenItems.forEach(item => {
-      this.logger.log(`Freeze guard: item #${item.id} locked at ${item.scheduled_for}, skipping`);
-    });
-
-    if (shiftableItems.length === 0) {
-      return { reshuffled: 0, frozen: frozenItems.length };
-    }
-
-    // Clear old schedule assignments
-    const shiftableIds = shiftableItems.map((item) => item.id);
-    await supabase
+    // 2. Lift: Update status to 'calculating' so Gap Finder views schedule as empty
+    const itemIds = pendingItems.map((item) => item.id);
+    const { error: markError } = await supabase
       .from('queue')
-      .update({ status: 'rescheduling' })
-      .in('id', shiftableIds);
+      .update({ status: 'calculating' })
+      .in('id', itemIds);
+
+    if (markError) {
+      this.logger.error(`Failed to temporarily update items to calculating: ${markError.message}`);
+      throw new Error(`Reshuffle failed during status preparation: ${markError.message}`);
+    }
 
     let reshuffledCount = 0;
 
-    for (const item of shiftableItems) {
+    // 3. Restack: Loop through fetched videos one by one
+    for (const item of pendingItems) {
       try {
         const { data: newSlot, error: rpcError } = await supabase
           .rpc('calculate_next_slot', { p_account_id: accountId });
@@ -131,6 +124,6 @@ export class SchedulerService {
       }
     }
 
-    return { reshuffled: reshuffledCount, frozen: frozenItems.length };
+    return { reshuffled: reshuffledCount, frozen: 0 };
   }
 }

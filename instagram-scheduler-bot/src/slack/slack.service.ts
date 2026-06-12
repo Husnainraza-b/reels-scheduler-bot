@@ -140,6 +140,8 @@ export class SlackService {
         `📥 Downloading file "${originalName}" (ID: ${fileId}) from Slack...`,
       );
 
+      let publicUrl: string | undefined;
+
       try {
         // --- Download from Slack as a stream ---
         const response = await axios.get<Readable>(downloadUrl, {
@@ -156,7 +158,6 @@ export class SlackService {
           `☁️  Streaming "${uniqueFileName}" to Cloudflare R2...`,
         );
 
-        let publicUrl;
         try {
           publicUrl = await this.cloudflareR2Service.uploadVideo(
             fileStream,
@@ -220,6 +221,19 @@ export class SlackService {
           error instanceof Error ? error.stack : String(error),
         );
 
+        // If R2 upload succeeded but queue insert failed, clean up the orphan file
+        if (publicUrl) {
+          try {
+            await this.cloudflareR2Service.deleteVideo(uniqueFileName);
+            this.logger.log(`🗑️  Cleaned up orphan R2 file: "${uniqueFileName}"`);
+          } catch (r2CleanupError) {
+            this.logger.warn(
+              `Failed to clean up orphan R2 file "${uniqueFileName}". ` +
+              `Manual cleanup may be needed.`,
+            );
+          }
+        }
+
         await this.sendSlackError(
           event.channel,
           event.user,
@@ -262,19 +276,27 @@ export class SlackService {
     username: string,
   ): Promise<{ id: number; username: string } | null> {
     const supabase = this.supabaseService.getClient();
-    const cleanUsername = username.startsWith('@') ? username.slice(1) : username;
+    // Strip leading @ so lookup works regardless of how accounts were stored
+    const clean = username.startsWith('@') ? username.slice(1) : username;
 
-    const { data, error } = await supabase
+    // Safe parameterised query — no string concatenation into filter
+    let { data } = await supabase
       .from('accounts')
       .select('id, username')
-      .or(`username.eq.${cleanUsername},username.eq.@${cleanUsername}`)
-      .single();
+      .eq('username', clean)
+      .maybeSingle();
 
-    if (error || !data) {
-      return null;
+    // Fallback: try with @ prefix for any older records
+    if (!data) {
+      const fallback = await supabase
+        .from('accounts')
+        .select('id, username')
+        .eq('username', `@${clean}`)
+        .maybeSingle();
+      data = fallback.data;
     }
 
-    return data as { id: number; username: string };
+    return data as { id: number; username: string } | null;
   }
 
   /**
