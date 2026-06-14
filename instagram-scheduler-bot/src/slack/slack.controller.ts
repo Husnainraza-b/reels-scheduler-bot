@@ -73,20 +73,24 @@ export class SlackController {
       this.logger.debug(`--> [CONTROLLER] Event callback triggered. Type: ${event.type}`);
       this.logger.debug(`--> [CONTROLLER] Files attached: ${event.files ? event.files.length : 0}`);
 
-      if (event.type === 'message' && event.files && event.files.length > 0) {
-        this.logger.log(
-          `Received file upload event from user "${event.user}" ` +
-            `in channel "${event.channel}" with ${event.files.length} file(s).`,
-        );
+      if (event.type === 'message' && !(event as any).bot_id) {
+        const hasText = !!(event.text && event.text.trim().length > 0);
+        const hasFiles = !!(event.files && event.files.length > 0);
 
-        // Fire-and-forget: process asynchronously so we return 200 instantly.
-        // Slack retries if it doesn't get a 200 within 3 seconds.
-        this.slackService.processIncomingFile(event).catch((error) => {
-          this.logger.error(
-            `Failed to process file from event "${(body as SlackEventCallback).event_id}".`,
-            error instanceof Error ? error.stack : String(error),
+        if (hasText || hasFiles) {
+          this.logger.log(
+            `Received message event from user "${event.user}" in channel "${event.channel}". Files: ${hasFiles ? event.files!.length : 0}`
           );
-        });
+
+          // Fire-and-forget: process asynchronously so we return 200 instantly.
+          // Slack retries if it doesn't get a 200 within 3 seconds.
+          this.slackService.processIncomingFile(event).catch((error) => {
+            this.logger.error(
+              `Failed to process event "${(body as SlackEventCallback).event_id}".`,
+              error instanceof Error ? error.stack : String(error),
+            );
+          });
+        }
       }
     }
 

@@ -3,6 +3,7 @@ import { LogOut } from 'lucide-react';
 import LoginScreen from './components/LoginScreen';
 import AccountsPanel from './components/AccountsPanel';
 import QueueStream from './components/QueueStream';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import {
   getAccounts,
   getSlots,
@@ -19,6 +20,7 @@ export default function App() {
   const { token, login, logout } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [activeView, setActiveView] = useState<'scheduler' | 'analytics'>('scheduler');
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
@@ -185,7 +187,30 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center bg-surface-low rounded-md p-1 border border-outline/30">
+              <button
+                onClick={() => setActiveView('scheduler')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-sm transition-colors cursor-pointer ${
+                  activeView === 'scheduler'
+                    ? 'bg-accent text-surface shadow'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Scheduler
+              </button>
+              <button
+                onClick={() => setActiveView('analytics')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-sm transition-colors cursor-pointer ${
+                  activeView === 'analytics'
+                    ? 'bg-accent text-surface shadow'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Analytics
+              </button>
+            </div>
+
             {/* Mobile: just the dot */}
             <div className="flex md:hidden items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
@@ -203,31 +228,59 @@ export default function App() {
 
       {/* ─── Main Canvas ─── */}
       <main className="py-12 min-h-screen">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-8 sm:px-12 max-w-7xl mx-auto">
-
-          {/* Left Column — Accounts */}
-          <div className="col-span-1 flex flex-col gap-4">
-            <AccountsPanel
-              accounts={accounts}
-              selectedAccountId={selectedAccountId}
-              onSelectAccount={handleSelectAccount}
-              onAccountCreated={handleAccountCreated}
-              onAccountDeleted={handleAccountDeleted}
-              slotsByAccount={slotsByAccount}
-              onSlotsChanged={handleSlotsChanged}
-            />
+        <div className="px-8 sm:px-12 max-w-7xl mx-auto">
+          {/* Mobile view toggle */}
+          <div className="md:hidden flex items-center bg-surface-low rounded-md p-1 border border-outline/30 mb-6">
+            <button
+              onClick={() => setActiveView('scheduler')}
+              className={`flex-1 py-2 text-xs font-medium rounded-sm transition-colors cursor-pointer ${
+                activeView === 'scheduler'
+                  ? 'bg-accent text-surface shadow'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Scheduler
+            </button>
+            <button
+              onClick={() => setActiveView('analytics')}
+              className={`flex-1 py-2 text-xs font-medium rounded-sm transition-colors cursor-pointer ${
+                activeView === 'analytics'
+                  ? 'bg-accent text-surface shadow'
+                  : 'text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              Analytics
+            </button>
           </div>
 
-          {/* Right Column — Queue */}
-          <div className="col-span-1 lg:col-span-2 lg:pl-8">
-            <QueueStream
-              queueItems={queueItems}
-              accounts={accounts}
-              isLoading={isQueueLoading}
-              onRefresh={fetchQueue}
-            />
-          </div>
+          {activeView === 'analytics' ? (
+            <AnalyticsDashboard />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Left Column — Accounts */}
+              <div className="col-span-1 flex flex-col gap-4">
+                <AccountsPanel
+                  accounts={accounts}
+                  selectedAccountId={selectedAccountId}
+                  onSelectAccount={handleSelectAccount}
+                  onAccountCreated={handleAccountCreated}
+                  onAccountDeleted={handleAccountDeleted}
+                  slotsByAccount={slotsByAccount}
+                  onSlotsChanged={handleSlotsChanged}
+                />
+              </div>
 
+              {/* Right Column — Queue */}
+              <div className="col-span-1 lg:col-span-2 lg:pl-8">
+                <QueueStream
+                  queueItems={queueItems}
+                  accounts={accounts}
+                  isLoading={isQueueLoading}
+                  onRefresh={fetchQueue}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

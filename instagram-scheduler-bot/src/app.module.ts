@@ -14,6 +14,7 @@ import { AuthModule } from './auth/auth.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { SlotsModule } from './slots/slots.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     AccountsModule,
     SlotsModule,
     SchedulerModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

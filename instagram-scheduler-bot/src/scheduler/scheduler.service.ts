@@ -24,13 +24,14 @@ export class SchedulerService {
     const { data: scheduledForUtc, error: rpcError } = await supabase
       .rpc('calculate_next_slot', { p_account_id: accountId });
 
+    let finalSlot = scheduledForUtc;
     if (rpcError) {
-      this.logger.error(`Gap Finder RPC failed for account ${accountId}`, rpcError.message);
-      throw new Error(`Failed to calculate next slot: ${rpcError.message}`);
-    }
-
-    if (!scheduledForUtc) {
-      throw new Error('Gap finder returned null slot.');
+      if (rpcError.message?.includes('No posting slots configured')) {
+        finalSlot = '2099-12-31T23:59:59.000Z';
+      } else {
+        this.logger.error(`Gap Finder RPC failed for account ${accountId}`, rpcError.message);
+        throw new Error(`Failed to calculate next slot: ${rpcError.message}`);
+      }
     }
 
     // 2. Insert into queue
@@ -40,7 +41,7 @@ export class SchedulerService {
         account_id: accountId,
         video_url: videoUrl,
         caption: caption || null,
-        scheduled_for: scheduledForUtc,
+        scheduled_for: finalSlot,
         status: 'pending',
         slack_file_id: slackFileId || null,
       })
@@ -103,15 +104,26 @@ export class SchedulerService {
         const { data: newSlot, error: rpcError } = await supabase
           .rpc('calculate_next_slot', { p_account_id: accountId });
 
-        if (rpcError || !newSlot) throw new Error(rpcError?.message || 'Null slot returned');
+        let finalSlot = newSlot;
+        if (rpcError) {
+          if (rpcError.message?.includes('No posting slots configured')) {
+            finalSlot = '2099-12-31T23:59:59.000Z';
+          } else {
+            throw new Error(rpcError.message || 'Gap finder failed');
+          }
+        }
 
-        await supabase
+        const { error: updateError } = await supabase
           .from('queue')
           .update({
-            scheduled_for: newSlot,
+            scheduled_for: finalSlot,
             status: 'pending',
           })
           .eq('id', item.id);
+
+        if (updateError) {
+          throw new Error(`Failed to update item: ${updateError.message}`);
+        }
 
         reshuffledCount++;
         this.logger.log(`✅ Reshuffled item #${item.id} → ${newSlot}`);

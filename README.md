@@ -61,6 +61,28 @@ This document serves as the absolute single source of truth for the entire Reels
   4. It decrypts the Instagram `access_token` securely.
   5. It communicates with the **Instagram Graph API** to upload the video from Cloudflare R2 and publish the reel with the associated caption.
   6. If successful, the video's status is changed to `published`. If Instagram throws an error, the status is changed to `failed`.
+  7. Upon successful publish, the large MP4 video file is instantly deleted from Cloudflare R2 to conserve storage space.
+  8. A secondary automated cleanup routine runs during this cron to permanently delete any `queue` records from Supabase that were published more than 30 days ago, keeping the database lean and well within free tier limits.
+
+### 5. Resilient Error Handling & Retry Logic
+**Goal:** Ensure temporary Meta API glitches don't ruin the posting schedule, and permanently failed videos don't block the queue.
+- **Flow:**
+  1. If publishing fails, the system implements exponential backoff, retrying the post up to 3 times (with 5-minute, 10-minute, etc. delays).
+  2. A real-time failure alert is sent to a configured Slack channel.
+  3. If all retries are exhausted, the system automatically triggers a queue reshuffle for that account. The failed video is bumped to the *next available posting slot*, ensuring the content is still posted eventually.
+  4. A final "rescheduled" alert is sent to Slack with the new timeslot.
+
+### 6. Analytics & Runway Tracking
+**Goal:** Give admins a bird's-eye view of account health and content buffers.
+- **Flow:**
+  1. The Analytics module calculates global stats (total pending, published, failed).
+  2. For each account, it calculates the "runway" — the furthest date into the future that content is currently scheduled for. This tells the social media manager exactly when they need to create more content.
+
+### 7. Account Pausing (Emergency Stop)
+**Goal:** Instantly halt publishing for a specific account without deleting its queue or schedule.
+- **Flow:** 
+  1. Admins can toggle an account's `queue_status` to `paused`.
+  2. The Cron Publisher instantly respects this flag and skips processing any pending videos for that account until it is resumed.
 
 ---
 
@@ -72,6 +94,7 @@ Stores the Instagram accounts connected to the system.
 - `username` (TEXT) - e.g., @my_instagram_page.
 - `instagram_business_id` (TEXT) - The unique ID provided by Facebook/Instagram.
 - `access_token` (TEXT) - The highly sensitive Graph API token. **Stored Encrypted**.
+- `queue_status` (TEXT) - Can be `active` or `paused`.
 - `created_at` (TIMESTAMPTZ)
 
 ### 2. `posting_slots` Table

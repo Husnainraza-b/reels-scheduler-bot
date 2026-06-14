@@ -9,10 +9,12 @@ import {
   Trash2,
   X,
   Pencil,
-  Settings
+  Settings,
+  Pause,
+  Play
 } from 'lucide-react';
 import type { Account, PostingSlot } from '../services/api';
-import { createAccount, deleteAccount, updateAccount } from '../services/api';
+import { createAccount, deleteAccount, updateAccount, toggleQueueStatus } from '../services/api';
 import SlotsConfigurator from './SlotsConfigurator';
 
 interface AccountsPanelProps {
@@ -49,6 +51,7 @@ export default function AccountsPanel({
   const [editBusinessId, setEditBusinessId] = useState('');
   const [editAccessToken, setEditAccessToken] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [togglingQueueId, setTogglingQueueId] = useState<number | null>(null);
 
   const handleEditAccountClick = (e: React.MouseEvent, account: Account) => {
     e.stopPropagation();
@@ -90,6 +93,23 @@ export default function AccountsPanel({
       setErrorMsg(err.response?.data?.error || 'Failed to delete account');
     } finally {
       setDeletingId((prev) => (prev === id ? null : prev));
+    }
+  };
+
+  const handleToggleQueue = async (e: React.MouseEvent, account: Account) => {
+    e.stopPropagation();
+    setTogglingQueueId(account.id);
+    setErrorMsg('');
+    try {
+      const newStatus = account.queue_status === 'active' ? 'paused' : 'active';
+      await toggleQueueStatus(account.id, newStatus);
+      // Wait a moment for reshuffle if resumed, then refresh accounts
+      setTimeout(() => onAccountCreated(), 500); 
+    } catch (err) {
+      console.error('Failed to toggle queue:', err);
+      setErrorMsg((err as any).response?.data?.error || 'Failed to update queue status');
+    } finally {
+      setTogglingQueueId(null);
     }
   };
 
@@ -294,9 +314,14 @@ export default function AccountsPanel({
                   >
                     <div className={`flex items-start justify-between ${!isActive ? 'opacity-60 group-hover:opacity-100 transition-opacity' : ''}`}>
                       <div>
-                        <h3 className={isActive ? 'text-2xl font-normal text-text-primary' : 'text-lg text-text-primary'}>
-                          @{account.username}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className={isActive ? 'text-2xl font-normal text-text-primary' : 'text-lg text-text-primary'}>
+                            @{account.username}
+                          </h3>
+                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-sm border ${account.queue_status === 'paused' ? 'bg-text-muted/10 text-text-muted border-text-muted/20' : 'bg-success/10 text-success border-success/20'}`}>
+                            {account.queue_status || 'ACTIVE'}
+                          </span>
+                        </div>
                         <p className="text-xs text-text-secondary mt-1">
                           ID: {account.instagram_business_id}
                         </p>
@@ -306,6 +331,20 @@ export default function AccountsPanel({
                       <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
                         {isActive ? (
                           <>
+                            <button
+                              onClick={(e) => handleToggleQueue(e, account)}
+                              disabled={togglingQueueId === account.id}
+                              className={`p-1.5 transition-colors rounded cursor-pointer ${account.queue_status === 'paused' ? 'text-success hover:bg-success/10' : 'text-text-secondary hover:text-text-primary hover:bg-surface-high'}`}
+                              title={account.queue_status === 'paused' ? 'Resume Queue' : 'Pause Queue'}
+                            >
+                              {togglingQueueId === account.id ? (
+                                <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                              ) : account.queue_status === 'paused' ? (
+                                <Play className="w-[18px] h-[18px]" fill="currentColor" />
+                              ) : (
+                                <Pause className="w-[18px] h-[18px]" fill="currentColor" />
+                              )}
+                            </button>
                             <button
                               onClick={(e) => handleEditAccountClick(e, account)}
                               className="p-1.5 text-text-secondary hover:text-text-primary transition-colors rounded hover:bg-surface-high cursor-pointer"

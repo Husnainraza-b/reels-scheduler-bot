@@ -47,17 +47,20 @@ const STATUS_CONFIG: Record<
   },
 };
 
-function formatPKT(utcTimestamp: string): string {
+function formatPKT(utcTimestamp: string | null): string {
+  if (!utcTimestamp || utcTimestamp.includes('2099')) return 'Unscheduled';
   const zonedDate = toZonedTime(new Date(utcTimestamp), TIMEZONE);
   return format(zonedDate, 'h:mm a');
 }
 
-function formatPKTFull(utcTimestamp: string): string {
+function formatPKTFull(utcTimestamp: string | null): string {
+  if (!utcTimestamp || utcTimestamp.includes('2099')) return 'No Date Assigned';
   const zonedDate = toZonedTime(new Date(utcTimestamp), TIMEZONE);
   return format(zonedDate, 'EEE, MMM d');
 }
 
-function getTimeUntil(utcTimestamp: string): string {
+function getTimeUntil(utcTimestamp: string | null): string {
+  if (!utcTimestamp || utcTimestamp.includes('2099')) return 'Waiting for slot';
   const target = new Date(utcTimestamp);
   const now = new Date();
   if (target <= now) return 'Due now';

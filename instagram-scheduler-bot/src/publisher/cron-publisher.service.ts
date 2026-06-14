@@ -80,8 +80,30 @@ export class CronPublisherService {
     try {
       await this.recoverStuckItems();
       await this.runPublishLoop();
+      await this.cleanupOldPublishedItems();
     } finally {
       this.isRunning = false;
+    }
+  }
+
+  /**
+   * Cleanup step: deletes any queue items that were published more than 30 days ago.
+   * This keeps the Supabase database clean and well within the free tier limits.
+   */
+  private async cleanupOldPublishedItems(): Promise<void> {
+    const supabase = this.supabaseService.getClient();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { error } = await supabase
+      .from('queue')
+      .delete()
+      .eq('status', 'published')
+      .lt('published_at', thirtyDaysAgo);
+
+    if (error) {
+      this.logger.warn(`Failed to clean up old published items: ${error.message}`);
+    } else {
+      this.logger.debug('Old published items cleanup completed successfully.');
     }
   }
 
@@ -125,7 +147,8 @@ export class CronPublisherService {
         accounts (
           username,
           instagram_business_id,
-          access_token
+          access_token,
+          queue_status
         )
       `,
       )
@@ -150,11 +173,19 @@ export class CronPublisherService {
         username: string;
         instagram_business_id: string;
         access_token: string;
+        queue_status: string;
       };
 
       if (!account) {
         this.logger.error(
           `Queue item "${raw.id}" has no linked account. Skipping.`,
+        );
+        continue;
+      }
+
+      if (account.queue_status === 'paused') {
+        this.logger.debug(
+          `Account "@${account.username}" is paused. Skipping item "${raw.id}".`,
         );
         continue;
       }

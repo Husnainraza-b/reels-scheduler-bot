@@ -6,9 +6,14 @@ const api = axios.create({
 });
 
 // A mechanism to inject the token from context
-let currentToken: string | null = null;
+let currentToken: string | null = localStorage.getItem('auth_token');
 export const setApiToken = (token: string | null) => {
   currentToken = token;
+  if (token) {
+    localStorage.setItem('auth_token', token);
+  } else {
+    localStorage.removeItem('auth_token');
+  }
 };
 
 api.interceptors.request.use((config) => {
@@ -24,6 +29,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       currentToken = null;
+      localStorage.removeItem('auth_token');
       // Force navigation to login screen
       if (window.location.pathname !== '/') {
         window.location.href = '/';
@@ -40,6 +46,7 @@ export interface Account {
   username: string;
   instagram_business_id: string;
   created_at: string;
+  queue_status: string;
 }
 
 export interface PostingSlot {
@@ -110,6 +117,11 @@ export async function deleteAccount(id: number): Promise<void> {
   await api.delete(`/dashboard/accounts/${id}`);
 }
 
+export async function toggleQueueStatus(id: number, status: 'active' | 'paused'): Promise<Account> {
+  const { data } = await api.post<Account>(`/dashboard/accounts/${id}/toggle-queue`, { status });
+  return data;
+}
+
 // ─── Slot Endpoints ───
 
 export async function getSlots(accountId: number): Promise<PostingSlot[]> {
@@ -162,6 +174,33 @@ export async function updateQueueCaption(id: number, caption: string): Promise<Q
 
 export async function deleteQueueItem(id: number): Promise<void> {
   await api.delete(`/queue/${id}`);
+}
+
+// ─── Analytics Endpoints ───
+
+export interface AccountAnalytics {
+  username: string;
+  queue_status: string;
+  total_slots: number;
+  slot_times: string[];
+  pending: number;
+  published: number;
+  failed: number;
+  runway: string | null;
+}
+
+export interface AnalyticsOverview {
+  global: {
+    total_pending: number;
+    total_published: number;
+    total_failed: number;
+  };
+  accounts: AccountAnalytics[];
+}
+
+export async function getAnalyticsOverview(): Promise<AnalyticsOverview> {
+  const { data } = await api.get<AnalyticsOverview>('/analytics/overview');
+  return data;
 }
 
 export default api;

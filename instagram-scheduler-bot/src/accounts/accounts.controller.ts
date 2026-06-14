@@ -16,6 +16,7 @@ import { SupabaseService } from '../database/supabase.service';
 import { EncryptionService } from '../crypto/encryption.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
+import { SchedulerService } from '../scheduler/scheduler.service';
 
 interface CreateAccountDto {
   username: string;
@@ -34,6 +35,7 @@ interface AccountResponse {
   username: string;
   instagram_business_id: string;
   created_at: string;
+  queue_status: string;
 }
 
 @Controller('dashboard/accounts')
@@ -45,6 +47,7 @@ export class AccountsController {
     private readonly supabaseService: SupabaseService,
     private readonly encryptionService: EncryptionService,
     private readonly cloudflareR2Service: CloudflareR2Service,
+    private readonly schedulerService: SchedulerService,
   ) {}
 
   @Get()
@@ -53,7 +56,7 @@ export class AccountsController {
 
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, username, instagram_business_id, created_at')
+      .select('id, username, instagram_business_id, created_at, queue_status')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -96,8 +99,9 @@ export class AccountsController {
         username: cleanUsername,
         instagram_business_id,
         access_token: `${iv}:${encryptedText}`,
+        queue_status: 'active',
       })
-      .select('id, username, instagram_business_id, created_at')
+      .select('id, username, instagram_business_id, created_at, queue_status')
       .single();
 
     if (error) {
@@ -182,7 +186,7 @@ export class AccountsController {
       .from('accounts')
       .update(updates)
       .eq('id', id)
-      .select('id, username, instagram_business_id, created_at')
+      .select('id, username, instagram_business_id, created_at, queue_status')
       .single();
 
     if (error) {
@@ -191,6 +195,43 @@ export class AccountsController {
     }
 
     this.logger.log(`🔄 Account updated: "${data.username}" (${data.instagram_business_id})`);
+    return data as AccountResponse;
+  }
+
+  @Post(':id/toggle-queue')
+  @HttpCode(HttpStatus.OK)
+  async toggleQueueStatus(
+    @Param('id') id: string,
+    @Body('status') status: 'active' | 'paused',
+  ): Promise<AccountResponse> {
+    if (status !== 'active' && status !== 'paused') {
+      throw new BadRequestException({ error: 'Invalid status', code: 'INVALID_STATUS' });
+    }
+
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .update({ queue_status: status })
+      .eq('id', id)
+      .select('id, username, instagram_business_id, created_at, queue_status')
+      .single();
+
+    if (error) {
+      this.logger.error(`Failed to toggle queue for account ${id}.`, error.message);
+      throw new BadRequestException({ error: `Failed to toggle queue: ${error.message}`, code: 'UPDATE_FAILED' });
+    }
+
+    this.logger.log(`🔄 Account queue toggled: "${data.username}" -> ${status}`);
+
+    if (status === 'active') {
+      try {
+        await this.schedulerService.reshuffleQueue(id);
+      } catch (err) {
+        this.logger.error(`Failed to reshuffle queue for account ${id} after resuming`, err instanceof Error ? err.stack : String(err));
+      }
+    }
+
     return data as AccountResponse;
   }
 }
