@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { WebClient } from '@slack/web-api';
 import axios from 'axios';
 import { Readable } from 'stream';
+import * as emoji from 'node-emoji';
 import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
 import { SupabaseService } from '../database/supabase.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+
 
 /**
  * Processes incoming Slack file uploads with Tenant Routing:
@@ -61,7 +63,7 @@ export class SlackService {
     channel: string;
     user: string;
   }): Promise<void> {
-    const rawText = event.text?.trim() || '';
+    const rawText = emoji.emojify(event.text?.trim() || '');
     const hasFiles = event.files && event.files.length > 0;
 
     // --- PHASE 1: Safety Gate ---

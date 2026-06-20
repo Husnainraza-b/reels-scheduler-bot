@@ -317,6 +317,15 @@ export class CronPublisherService {
       this.logger.log(
         `✅ Published item "${item.id}" for @${item.username}!`,
       );
+
+      try {
+        await this.slackClient.chat.postMessage({
+          channel: this.alertChannel,
+          text: `🎉 *SUCCESSFULLY PUBLISHED* 🚀\n\n*Account:* @${item.username}\n*Video:* \`${fileName || 'video.mp4'}\`\n*Queue Item ID:* #${item.id}\n\nThe reel is now live on Instagram!`,
+        });
+      } catch (slackError) {
+        this.logger.error('Failed to send success alert to Slack', slackError instanceof Error ? slackError.message : String(slackError));
+      }
     } catch (error) {
       await this.handlePublishError(item, error);
     }

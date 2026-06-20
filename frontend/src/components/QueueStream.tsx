@@ -45,6 +45,12 @@ const STATUS_CONFIG: Record<
     badgeClass: 'bg-warning/10 text-warning border border-warning/20',
     isActive: true,
   },
+  paused: {
+    label: 'Paused',
+    dotClass: 'bg-text-muted border-[3px] border-surface',
+    badgeClass: 'bg-text-muted/10 text-text-muted border border-text-muted/20',
+    isActive: false,
+  },
 };
 
 function formatPKT(utcTimestamp: string | null): string {
@@ -194,7 +200,11 @@ export default function QueueStream({
       ) : (
         <div className="relative ml-4 pl-8 border-l border-outline/20 space-y-12 pb-12">
           {localQueueItems.map((item) => {
-            const statusCfg = STATUS_CONFIG[item.status] || STATUS_CONFIG['pending'];
+            const account = accounts.find((a) => a.id === item.account_id);
+            const isPaused = account?.queue_status === 'paused';
+            const effectiveStatus = (item.status === 'pending' && isPaused) ? 'paused' : item.status;
+            
+            const statusCfg = STATUS_CONFIG[effectiveStatus] || STATUS_CONFIG['pending'];
             const isDeleting = deletingId === item.id;
 
             return (
@@ -214,7 +224,7 @@ export default function QueueStream({
                       {formatPKT(item.scheduled_for)}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded ${statusCfg.badgeClass}`}>
-                      {statusCfg.isActive ? statusCfg.label : getTimeUntil(item.scheduled_for)}
+                      {statusCfg.isActive || effectiveStatus === 'paused' ? statusCfg.label : getTimeUntil(item.scheduled_for)}
                     </span>
                   </div>
 
