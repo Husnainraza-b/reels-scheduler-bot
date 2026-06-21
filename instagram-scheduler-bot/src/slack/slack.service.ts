@@ -142,23 +142,24 @@ export class SlackService {
       const downloadUrl = file.url_private_download;
       const originalName = file.name || 'video.mp4';
       const mimetype = file.mimetype || '';
+      const extension = originalName.split('.').pop()?.toLowerCase() || 'mp4';
+      
+      const isVideoMimeType = mimetype.startsWith('video/');
+      const isVideoExtension = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(extension);
 
       // Non-video file rejection
-      if (!mimetype.startsWith('video/')) {
-        this.logger.warn(
-          `Non-video file uploaded: ${mimetype}. Alerting user.`,
-        );
+      if (!isVideoMimeType && !isVideoExtension) {
+        this.logger.warn(`Non-video file uploaded: ${mimetype} (ext: ${extension}). Alerting user.`);
         await this.sendSlackError(
           event.channel,
           event.user,
           `❌ *Error:* Only video files are accepted.\n` +
-            `You uploaded: \`${originalName}\` (${mimetype})`,
+            `You uploaded: \`${originalName}\` (${mimetype || 'unknown type'})`,
         );
         continue;
       }
 
       // Generate a unique filename to avoid collisions in R2
-      const extension = originalName.split('.').pop() || 'mp4';
       const uniqueFileName = `${Date.now()}-${fileId}.${extension}`;
 
       this.logger.log(
