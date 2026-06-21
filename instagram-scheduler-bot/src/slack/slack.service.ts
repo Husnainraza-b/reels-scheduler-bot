@@ -9,7 +9,6 @@ import { SupabaseService } from '../database/supabase.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 
-
 /**
  * Processes incoming Slack file uploads with Tenant Routing:
  * 1. Parses the @username from the caption to determine which account.
@@ -74,7 +73,9 @@ export class SlackService {
     }
 
     if (!hasFiles) {
-      this.logger.warn('processIncomingFile called with no files and no text. Skipping.');
+      this.logger.warn(
+        'processIncomingFile called with no files and no text. Skipping.',
+      );
       return;
     }
 
@@ -84,7 +85,9 @@ export class SlackService {
     const rawCaption = rawText;
     this.logger.debug(`--> [SERVICE] Raw caption received: ${rawCaption}`);
     const { username, caption } = this.parseCaption(rawCaption);
-    this.logger.debug(`--> [SERVICE] Extracted Username: ${username} | Cleaned Caption: ${caption}`);
+    this.logger.debug(
+      `--> [SERVICE] Extracted Username: ${username} | Cleaned Caption: ${caption}`,
+    );
 
     if (!username) {
       this.logger.warn(
@@ -105,10 +108,15 @@ export class SlackService {
     try {
       account = await this.lookupAccount(username);
       if (!account) {
-        this.logger.error(`[DB EXCEPTION] Account not found for username: ${username}`);
+        this.logger.error(
+          `[DB EXCEPTION] Account not found for username: ${username}`,
+        );
       }
     } catch (dbError) {
-      this.logger.error(`[DB EXCEPTION] Error during account lookup for username: ${username}`, dbError instanceof Error ? dbError.stack : String(dbError));
+      this.logger.error(
+        `[DB EXCEPTION] Error during account lookup for username: ${username}`,
+        dbError instanceof Error ? dbError.stack : String(dbError),
+      );
       account = null;
     }
 
@@ -137,7 +145,9 @@ export class SlackService {
 
       // Non-video file rejection
       if (!mimetype.startsWith('video/')) {
-        this.logger.warn(`Non-video file uploaded: ${mimetype}. Alerting user.`);
+        this.logger.warn(
+          `Non-video file uploaded: ${mimetype}. Alerting user.`,
+        );
         await this.sendSlackError(
           event.channel,
           event.user,
@@ -178,11 +188,12 @@ export class SlackService {
             fileStream,
             uniqueFileName,
           );
-          this.logger.log(
-            `✅ Upload complete. Public URL: ${publicUrl}`,
-          );
+          this.logger.log(`✅ Upload complete. Public URL: ${publicUrl}`);
         } catch (r2Error) {
-          this.logger.error(`[R2 EXCEPTION] Failed to upload video to Cloudflare R2: ${uniqueFileName}`, r2Error instanceof Error ? r2Error.stack : String(r2Error));
+          this.logger.error(
+            `[R2 EXCEPTION] Failed to upload video to Cloudflare R2: ${uniqueFileName}`,
+            r2Error instanceof Error ? r2Error.stack : String(r2Error),
+          );
           throw r2Error;
         }
 
@@ -196,7 +207,10 @@ export class SlackService {
             fileId,
           );
         } catch (dbError) {
-          this.logger.error(`[DB EXCEPTION] Failed to insert queue record via Gap Finder for account ${account.id}`, dbError instanceof Error ? dbError.stack : String(dbError));
+          this.logger.error(
+            `[DB EXCEPTION] Failed to insert queue record via Gap Finder for account ${account.id}`,
+            dbError instanceof Error ? dbError.stack : String(dbError),
+          );
           throw dbError;
         }
 
@@ -227,7 +241,9 @@ export class SlackService {
         } catch (slackDeleteError) {
           this.logger.warn(
             `Could not delete file "${fileId}" from Slack workspace (likely due to human-authorship / missing scope limitations). Skipping deletion.`,
-            slackDeleteError instanceof Error ? slackDeleteError.message : String(slackDeleteError),
+            slackDeleteError instanceof Error
+              ? slackDeleteError.message
+              : String(slackDeleteError),
           );
         }
       } catch (error) {
@@ -240,11 +256,13 @@ export class SlackService {
         if (publicUrl) {
           try {
             await this.cloudflareR2Service.deleteVideo(uniqueFileName);
-            this.logger.log(`🗑️  Cleaned up orphan R2 file: "${uniqueFileName}"`);
+            this.logger.log(
+              `🗑️  Cleaned up orphan R2 file: "${uniqueFileName}"`,
+            );
           } catch (r2CleanupError) {
             this.logger.warn(
               `Failed to clean up orphan R2 file "${uniqueFileName}". ` +
-              `Manual cleanup may be needed.`,
+                `Manual cleanup may be needed.`,
             );
           }
         }
@@ -260,7 +278,10 @@ export class SlackService {
   }
 
   // --- PHASE 2: Strict Command Routing ---
-  private async routeCommand(rawText: string, event: { channel: string; user: string }): Promise<void> {
+  private async routeCommand(
+    rawText: string,
+    event: { channel: string; user: string },
+  ): Promise<void> {
     const cleanText = rawText.trim();
     const lowerText = cleanText.toLowerCase();
 
@@ -269,13 +290,20 @@ export class SlackService {
     const normalizedLower = normalizedText.toLowerCase();
 
     // 1. Master Directory
-    if (normalizedLower === 'commands' || normalizedLower === '@commands' || normalizedLower === 'system commands') {
+    if (
+      normalizedLower === 'commands' ||
+      normalizedLower === '@commands' ||
+      normalizedLower === 'system commands'
+    ) {
       await this.handleCommandsDirectory(event.channel);
       return;
     }
 
     // 2. System Overview / Analytics
-    if (normalizedLower === 'system overview' || normalizedLower === 'analytics') {
+    if (
+      normalizedLower === 'system overview' ||
+      normalizedLower === 'analytics'
+    ) {
       await this.handleAnalyticsCommand(event.channel);
       return;
     }
@@ -283,28 +311,50 @@ export class SlackService {
     // 3. Pause Queue
     const pauseMatch = normalizedLower.match(/^pause-queue\s+@(\S+)$/i);
     if (pauseMatch) {
-      await this.handleQueueToggleCommand(event.channel, pauseMatch[1], 'paused');
+      await this.handleQueueToggleCommand(
+        event.channel,
+        pauseMatch[1],
+        'paused',
+      );
       return;
     }
 
     // 4. Resume Queue
     const resumeMatch = normalizedLower.match(/^resume-queue\s+@(\S+)$/i);
     if (resumeMatch) {
-      await this.handleQueueToggleCommand(event.channel, resumeMatch[1], 'active');
+      await this.handleQueueToggleCommand(
+        event.channel,
+        resumeMatch[1],
+        'active',
+      );
       return;
     }
 
     // 5. Add Slot
-    const addSlotMatch = normalizedText.match(/^add-slot\s+((?:["“”][^"“”]+["“”]\s*)+)@(\S+)$/i);
+    const addSlotMatch = normalizedText.match(
+      /^add-slot\s+((?:["“”][^"“”]+["“”]\s*)+)@(\S+)$/i,
+    );
     if (addSlotMatch) {
-      await this.handleSlotCommand(event.channel, addSlotMatch[1], addSlotMatch[2], 'add');
+      await this.handleSlotCommand(
+        event.channel,
+        addSlotMatch[1],
+        addSlotMatch[2],
+        'add',
+      );
       return;
     }
 
     // 6. Remove Slot
-    const removeSlotMatch = normalizedText.match(/^remove-slot\s+((?:["“”][^"“”]+["“”]\s*)+)@(\S+)$/i);
+    const removeSlotMatch = normalizedText.match(
+      /^remove-slot\s+((?:["“”][^"“”]+["“”]\s*)+)@(\S+)$/i,
+    );
     if (removeSlotMatch) {
-      await this.handleSlotCommand(event.channel, removeSlotMatch[1], removeSlotMatch[2], 'remove');
+      await this.handleSlotCommand(
+        event.channel,
+        removeSlotMatch[1],
+        removeSlotMatch[2],
+        'remove',
+      );
       return;
     }
 
@@ -364,7 +414,12 @@ export class SlackService {
   }
 
   // --- PHASE 3: Slot Management Logic ---
-  private async handleSlotCommand(channel: string, timesStr: string, username: string, action: 'add' | 'remove'): Promise<void> {
+  private async handleSlotCommand(
+    channel: string,
+    timesStr: string,
+    username: string,
+    action: 'add' | 'remove',
+  ): Promise<void> {
     try {
       const account = await this.lookupAccount(username);
       if (!account) {
@@ -378,7 +433,7 @@ export class SlackService {
       // Parse quoted times (supporting both straight and smart quotes)
       const timeRegex = /["“”]([^"“”]+)["“”]/g;
       let match;
-      const parsedTimes: { original: string, formatted: string }[] = [];
+      const parsedTimes: { original: string; formatted: string }[] = [];
       const invalidTimes: string[] = [];
 
       while ((match = timeRegex.exec(timesStr)) !== null) {
@@ -400,14 +455,16 @@ export class SlackService {
       }
 
       const supabase = this.supabaseService.getClient();
-      
+
       // Get existing slots to ignore duplicates
       const { data: existingSlots } = await supabase
         .from('posting_slots')
         .select('id, slot_time')
         .eq('account_id', account.id);
 
-      const existingTimes = new Set((existingSlots || []).map(s => s.slot_time));
+      const existingTimes = new Set(
+        (existingSlots || []).map((s) => s.slot_time),
+      );
 
       const processed: string[] = [];
       const ignored: string[] = [];
@@ -431,12 +488,13 @@ export class SlackService {
         await this.schedulerService.reshuffleQueue(account.id);
 
         let msg = `✅ Slots updated for \`@${username}\`.\n*Added*: ${processed.length > 0 ? processed.join(', ') : 'None'}.`;
-        if (ignored.length > 0) msg += `\n*Ignored (already exists)*: ${ignored.join(', ')}.`;
-        if (invalidTimes.length > 0) msg += `\n*Invalid format*: ${invalidTimes.join(', ')}.`;
+        if (ignored.length > 0)
+          msg += `\n*Ignored (already exists)*: ${ignored.join(', ')}.`;
+        if (invalidTimes.length > 0)
+          msg += `\n*Invalid format*: ${invalidTimes.join(', ')}.`;
 
         await this.webClient.chat.postMessage({ channel, text: msg });
         return;
-
       } else {
         // action === 'remove'
         const toDelete: string[] = [];
@@ -461,14 +519,17 @@ export class SlackService {
 
         let msg = `🗑️ Slots removed for \`@${username}\`.\n*Removed*: ${processed.length > 0 ? processed.join(', ') : 'None'}.`;
         if (ignored.length > 0) msg += `\n*Not found*: ${ignored.join(', ')}.`;
-        if (invalidTimes.length > 0) msg += `\n*Invalid format*: ${invalidTimes.join(', ')}.`;
+        if (invalidTimes.length > 0)
+          msg += `\n*Invalid format*: ${invalidTimes.join(', ')}.`;
 
         await this.webClient.chat.postMessage({ channel, text: msg });
         return;
       }
-
     } catch (error) {
-      this.logger.error(`Failed to execute slot command for @${username}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Failed to execute slot command for @${username}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       await this.webClient.chat.postMessage({
         channel,
         text: `❌ Failed to update slots for \`@${username}\`.`,
@@ -479,7 +540,7 @@ export class SlackService {
   private parseTime12to24(timeStr: string): string | null {
     const match = timeStr.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
     if (!match) return null;
-    let [ , hStr, mStr, period ] = match;
+    let [, hStr, mStr, period] = match;
     let hours = parseInt(hStr, 10);
     const minutes = mStr || '00';
     if (hours < 1 || hours > 12) return null;
@@ -567,7 +628,7 @@ export class SlackService {
   private async handleAnalyticsCommand(channel: string): Promise<void> {
     try {
       const overview = await this.analyticsService.getOverview();
-      
+
       const blocks: any[] = [
         {
           type: 'header',
@@ -588,11 +649,16 @@ export class SlackService {
       ];
 
       for (const acc of overview.accounts) {
-        const healthEmoji = acc.failed > 0 ? '🔴' : acc.queue_status === 'paused' ? '⏸️' : '🟢';
+        const healthEmoji =
+          acc.failed > 0 ? '🔴' : acc.queue_status === 'paused' ? '⏸️' : '🟢';
         let runwayText = 'None';
         if (acc.runway) {
           const date = new Date(acc.runway);
-          runwayText = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          runwayText = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+          });
         }
 
         blocks.push({
@@ -610,7 +676,10 @@ export class SlackService {
         blocks,
       });
     } catch (error) {
-      this.logger.error('Failed to handle analytics command', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Failed to handle analytics command',
+        error instanceof Error ? error.stack : String(error),
+      );
       await this.webClient.chat.postMessage({
         channel,
         text: '❌ Failed to fetch analytics overview.',
@@ -618,7 +687,11 @@ export class SlackService {
     }
   }
 
-  private async handleQueueToggleCommand(channel: string, username: string, status: 'active' | 'paused'): Promise<void> {
+  private async handleQueueToggleCommand(
+    channel: string,
+    username: string,
+    status: 'active' | 'paused',
+  ): Promise<void> {
     try {
       const account = await this.lookupAccount(username);
       if (!account) {
@@ -649,7 +722,10 @@ export class SlackService {
         text: `${emoji} Queue for \`@${username}\` has been set to *${status}*${extraMsg}.`,
       });
     } catch (error) {
-      this.logger.error(`Failed to handle queue toggle command for @${username}`, error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        `Failed to handle queue toggle command for @${username}`,
+        error instanceof Error ? error.stack : String(error),
+      );
       await this.webClient.chat.postMessage({
         channel,
         text: `❌ Failed to update queue status for \`@${username}\`.`,

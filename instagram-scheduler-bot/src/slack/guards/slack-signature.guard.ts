@@ -39,9 +39,9 @@ export class SlackSignatureGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     this.logger.log('--> [WEBHOOK HIT] Request received at /slack/events');
 
-    const request = context.switchToHttp().getRequest<
-      Request & { rawBody?: Buffer }
-    >();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { rawBody?: Buffer }>();
 
     const timestamp = request.headers['x-slack-request-timestamp'] as
       | string
@@ -55,9 +55,7 @@ export class SlackSignatureGuard implements CanActivate {
       this.logger.warn(
         'Rejected request: Missing x-slack-request-timestamp or x-slack-signature header.',
       );
-      throw new ForbiddenException(
-        'Missing Slack signature headers.',
-      );
+      throw new ForbiddenException('Missing Slack signature headers.');
     }
 
     // --- Replay attack prevention: reject timestamps older than 5 minutes ---
@@ -101,7 +99,9 @@ export class SlackSignatureGuard implements CanActivate {
       computedBuffer.length !== receivedBuffer.length ||
       !crypto.timingSafeEqual(computedBuffer, receivedBuffer)
     ) {
-      this.logger.error('[GUARD EXCEPTION] Slack signature validation failed. Check SLACK_SIGNING_SECRET.');
+      this.logger.error(
+        '[GUARD EXCEPTION] Slack signature validation failed. Check SLACK_SIGNING_SECRET.',
+      );
       this.logger.warn('Rejected request: Slack signature mismatch.');
       throw new ForbiddenException('Invalid Slack signature.');
     }

@@ -46,15 +46,23 @@ export class QueueController {
       .order('scheduled_for', { ascending: true });
 
     if (error) {
-      this.logger.error(`Failed to fetch pending queue for account ${accountId}.`, error.message);
-      throw new BadRequestException({ error: `Failed to fetch queue: ${error.message}`, code: 'FETCH_FAILED' });
+      this.logger.error(
+        `Failed to fetch pending queue for account ${accountId}.`,
+        error.message,
+      );
+      throw new BadRequestException({
+        error: `Failed to fetch queue: ${error.message}`,
+        code: 'FETCH_FAILED',
+      });
     }
 
     return (data || []) as QueueItemResponse[];
   }
 
   @Get('dashboard/accounts/:id/queue/all')
-  async getFullQueue(@Param('id') accountId: string): Promise<QueueItemResponse[]> {
+  async getFullQueue(
+    @Param('id') accountId: string,
+  ): Promise<QueueItemResponse[]> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase
@@ -64,8 +72,14 @@ export class QueueController {
       .order('created_at', { ascending: false });
 
     if (error) {
-      this.logger.error(`Failed to fetch full queue for account ${accountId}.`, error.message);
-      throw new BadRequestException({ error: `Failed to fetch queue: ${error.message}`, code: 'FETCH_FAILED' });
+      this.logger.error(
+        `Failed to fetch full queue for account ${accountId}.`,
+        error.message,
+      );
+      throw new BadRequestException({
+        error: `Failed to fetch queue: ${error.message}`,
+        code: 'FETCH_FAILED',
+      });
     }
 
     return (data || []) as QueueItemResponse[];
@@ -77,7 +91,9 @@ export class QueueController {
     @Body() body: { caption: string },
   ) {
     if (body.caption === undefined) {
-      throw new BadRequestException('caption field is required in request body.');
+      throw new BadRequestException(
+        'caption field is required in request body.',
+      );
     }
     return this.queueService.updateCaption(id, body.caption);
   }

@@ -36,7 +36,10 @@ export class AdminAuthGuard implements CanActivate {
     const authHeader = request.headers['authorization'] as string;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+      throw new UnauthorizedException({
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+      });
     }
 
     const token = authHeader.slice(7); // Remove "Bearer " prefix
@@ -47,7 +50,10 @@ export class AdminAuthGuard implements CanActivate {
       !crypto.timingSafeEqual(this.adminPasswordBuffer, tokenBuffer)
     ) {
       this.logger.warn('Dashboard access denied: invalid admin password.');
-      throw new UnauthorizedException({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+      throw new UnauthorizedException({
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+      });
     }
 
     return true;

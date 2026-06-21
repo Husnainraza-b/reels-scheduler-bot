@@ -64,7 +64,9 @@ describe('SupabaseService', () => {
               provide: ConfigService,
               useValue: {
                 get: (key: string): string | undefined =>
-                  key === 'SUPABASE_SERVICE_ROLE_KEY' ? undefined : mockEnv[key],
+                  key === 'SUPABASE_SERVICE_ROLE_KEY'
+                    ? undefined
+                    : mockEnv[key],
               },
             },
           ],

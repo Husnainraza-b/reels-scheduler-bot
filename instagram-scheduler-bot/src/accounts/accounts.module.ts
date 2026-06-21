@@ -7,7 +7,13 @@ import { StorageModule } from '../storage/storage.module';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 
 @Module({
-  imports: [DatabaseModule, CryptoModule, AuthModule, StorageModule, SchedulerModule],
+  imports: [
+    DatabaseModule,
+    CryptoModule,
+    AuthModule,
+    StorageModule,
+    SchedulerModule,
+  ],
   controllers: [AccountsController],
 })
 export class AccountsModule {}

@@ -18,6 +18,6 @@ export const envValidationSchema = Joi.object({
   R2_BUCKET_NAME: Joi.string().required(),
   R2_PUBLIC_DEV_URL: Joi.string().uri().required(),
   META_GRAPH_API_VERSION: Joi.string().valid('v20.0').default('v20.0'),
-  FRONTEND_URL:        Joi.string().uri().optional(),
+  FRONTEND_URL: Joi.string().uri().optional(),
   SLACK_ALERT_CHANNEL: Joi.string().default('#general'),
 });

@@ -62,16 +62,24 @@ export class AnalyticsService {
     if (!accountsData) return overview;
 
     for (const acc of accountsData) {
-      const accountQueue = (queueData || []).filter((q) => q.account_id === acc.id);
-      const accountSlots = (slotsData || []).filter((s) => s.account_id === acc.id);
+      const accountQueue = (queueData || []).filter(
+        (q) => q.account_id === acc.id,
+      );
+      const accountSlots = (slotsData || []).filter(
+        (s) => s.account_id === acc.id,
+      );
 
       const pendingItems = accountQueue.filter((q) => q.status === 'pending');
-      const published = accountQueue.filter((q) => q.status === 'published').length;
+      const published = accountQueue.filter(
+        (q) => q.status === 'published',
+      ).length;
       const failed = accountQueue.filter((q) => q.status === 'failed').length;
       const pending = pendingItems.length;
 
       let runway: string | null = null;
-      const validPendingItems = pendingItems.filter(item => !item.scheduled_for.includes('2099'));
+      const validPendingItems = pendingItems.filter(
+        (item) => !item.scheduled_for.includes('2099'),
+      );
       if (validPendingItems.length > 0) {
         const maxDate = validPendingItems.reduce((max, item) => {
           const itemDate = new Date(item.scheduled_for);
@@ -88,7 +96,7 @@ export class AnalyticsService {
         username: acc.username,
         queue_status: acc.queue_status || 'active',
         total_slots: accountSlots.length,
-        slot_times: accountSlots.map(s => s.slot_time).sort(),
+        slot_times: accountSlots.map((s) => s.slot_time).sort(),
         pending,
         published,
         failed,

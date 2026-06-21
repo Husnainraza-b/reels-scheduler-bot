@@ -1,4 +1,11 @@
-import { Controller, Post, Headers, HttpCode, HttpStatus, ForbiddenException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CronPublisherService } from './cron-publisher.service';
 import * as crypto from 'crypto';

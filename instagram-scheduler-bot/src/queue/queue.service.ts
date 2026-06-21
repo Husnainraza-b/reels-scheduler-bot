@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
@@ -27,8 +32,12 @@ export class QueueService {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to update caption for video #${id}: ${error.message}`);
-      throw new BadRequestException(`Failed to update caption: ${error.message}`);
+      this.logger.error(
+        `Failed to update caption for video #${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to update caption: ${error.message}`,
+      );
     }
 
     return data;
@@ -48,14 +57,17 @@ export class QueueService {
       .single();
 
     if (fetchError || !item) {
-      this.logger.error(`Queue item #${id} not found for deletion. Error: ${fetchError?.message}`);
+      this.logger.error(
+        `Queue item #${id} not found for deletion. Error: ${fetchError?.message}`,
+      );
       throw new NotFoundException(`Queue item #${id} not found.`);
     }
 
     // Guard: cannot delete an item that is actively being published
     if (item.status === 'processing') {
       throw new BadRequestException({
-        error: 'Cannot delete a video that is currently being published. Wait a minute and try again.',
+        error:
+          'Cannot delete a video that is currently being published. Wait a minute and try again.',
         code: 'ITEM_IS_PROCESSING',
       });
     }
@@ -83,8 +95,12 @@ export class QueueService {
       .eq('id', id);
 
     if (deleteError) {
-      this.logger.error(`Failed to delete queue item #${id} from database: ${deleteError.message}`);
-      throw new BadRequestException(`Failed to delete video row: ${deleteError.message}`);
+      this.logger.error(
+        `Failed to delete queue item #${id} from database: ${deleteError.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to delete video row: ${deleteError.message}`,
+      );
     }
     this.logger.log(`✅ Queue item #${id} deleted from database.`);
 
@@ -92,7 +108,12 @@ export class QueueService {
     try {
       await this.schedulerService.reshuffleQueue(accountId);
     } catch (reshuffleError) {
-      this.logger.warn(`Queue reshuffle failed after deleting item #${id}.`, reshuffleError instanceof Error ? reshuffleError.message : String(reshuffleError));
+      this.logger.warn(
+        `Queue reshuffle failed after deleting item #${id}.`,
+        reshuffleError instanceof Error
+          ? reshuffleError.message
+          : String(reshuffleError),
+      );
     }
 
     return { success: true };

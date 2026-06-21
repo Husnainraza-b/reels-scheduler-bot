@@ -1,4 +1,12 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UnauthorizedException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpCode,
+  HttpStatus,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 
@@ -11,12 +19,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body('password') password?: string) {
     if (!password) {
-      throw new UnauthorizedException({ error: 'Password required', code: 'UNAUTHORIZED' });
+      throw new UnauthorizedException({
+        error: 'Password required',
+        code: 'UNAUTHORIZED',
+      });
     }
 
     const isValid = this.authService.validatePassword(password);
     if (!isValid) {
-      throw new UnauthorizedException({ error: 'Invalid password', code: 'UNAUTHORIZED' });
+      throw new UnauthorizedException({
+        error: 'Invalid password',
+        code: 'UNAUTHORIZED',
+      });
     }
 
     return { success: true };

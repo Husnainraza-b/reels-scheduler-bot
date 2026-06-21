@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 
-
 @Injectable()
 export class SchedulerService {
   private readonly logger = new Logger(SchedulerService.name);
@@ -21,15 +20,20 @@ export class SchedulerService {
     const supabase = this.supabaseService.getClient();
 
     // 1. Call RPC to get next available slot atomically
-    const { data: scheduledForUtc, error: rpcError } = await supabase
-      .rpc('calculate_next_slot', { p_account_id: accountId });
+    const { data: scheduledForUtc, error: rpcError } = await supabase.rpc(
+      'calculate_next_slot',
+      { p_account_id: accountId },
+    );
 
     let finalSlot = scheduledForUtc;
     if (rpcError) {
       if (rpcError.message?.includes('No posting slots configured')) {
         finalSlot = '2099-12-31T23:59:59.000Z';
       } else {
-        this.logger.error(`Gap Finder RPC failed for account ${accountId}`, rpcError.message);
+        this.logger.error(
+          `Gap Finder RPC failed for account ${accountId}`,
+          rpcError.message,
+        );
         throw new Error(`Failed to calculate next slot: ${rpcError.message}`);
       }
     }
@@ -49,7 +53,10 @@ export class SchedulerService {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to insert queue record for account ${accountId}`, error.message);
+      this.logger.error(
+        `Failed to insert queue record for account ${accountId}`,
+        error.message,
+      );
       throw new Error(`Failed to insert queue record: ${error.message}`);
     }
 
@@ -64,7 +71,9 @@ export class SchedulerService {
   /**
    * Reshuffles all pending queue items using the strict Lift and Restack logic.
    */
-  async reshuffleQueue(accountId: number | string): Promise<{ reshuffled: number; frozen: number }> {
+  async reshuffleQueue(
+    accountId: number | string,
+  ): Promise<{ reshuffled: number; frozen: number }> {
     const supabase = this.supabaseService.getClient();
 
     // 1. Fetch: Retrieve all videos for the account where status = 'pending', strictly ordered by created_at ASC
@@ -76,7 +85,10 @@ export class SchedulerService {
       .order('created_at', { ascending: true });
 
     if (fetchError) {
-      this.logger.error(`Failed to fetch pending queue for reshuffle.`, fetchError.message);
+      this.logger.error(
+        `Failed to fetch pending queue for reshuffle.`,
+        fetchError.message,
+      );
       throw new Error(`Failed to fetch queue: ${fetchError.message}`);
     }
 
@@ -92,8 +104,12 @@ export class SchedulerService {
       .in('id', itemIds);
 
     if (markError) {
-      this.logger.error(`Failed to temporarily update items to calculating: ${markError.message}`);
-      throw new Error(`Reshuffle failed during status preparation: ${markError.message}`);
+      this.logger.error(
+        `Failed to temporarily update items to calculating: ${markError.message}`,
+      );
+      throw new Error(
+        `Reshuffle failed during status preparation: ${markError.message}`,
+      );
     }
 
     let reshuffledCount = 0;
@@ -101,8 +117,10 @@ export class SchedulerService {
     // 3. Restack: Loop through fetched videos one by one
     for (const item of pendingItems) {
       try {
-        const { data: newSlot, error: rpcError } = await supabase
-          .rpc('calculate_next_slot', { p_account_id: accountId });
+        const { data: newSlot, error: rpcError } = await supabase.rpc(
+          'calculate_next_slot',
+          { p_account_id: accountId },
+        );
 
         let finalSlot = newSlot;
         if (rpcError) {
@@ -128,7 +146,10 @@ export class SchedulerService {
         reshuffledCount++;
         this.logger.log(`✅ Reshuffled item #${item.id} → ${newSlot}`);
       } catch (error) {
-        this.logger.error(`Failed to calculate new slot for item #${item.id}. Restoring.`, error instanceof Error ? error.stack : String(error));
+        this.logger.error(
+          `Failed to calculate new slot for item #${item.id}. Restoring.`,
+          error instanceof Error ? error.stack : String(error),
+        );
         await supabase
           .from('queue')
           .update({ status: 'pending' })

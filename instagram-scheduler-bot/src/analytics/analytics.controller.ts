@@ -15,7 +15,10 @@ export class AnalyticsController {
     try {
       return await this.analyticsService.getOverview();
     } catch (error) {
-      this.logger.error('Failed to get analytics overview', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Failed to get analytics overview',
+        error instanceof Error ? error.stack : String(error),
+      );
       throw error;
     }
   }

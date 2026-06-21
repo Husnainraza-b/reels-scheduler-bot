@@ -69,9 +69,26 @@ export class SlackController {
 
     // --- Rule 2: Event Callback ---
     if (body.type === 'event_callback') {
-      const { event } = body as SlackEventCallback;
-      this.logger.debug(`--> [CONTROLLER] Event callback triggered. Type: ${event.type}`);
-      this.logger.debug(`--> [CONTROLLER] Files attached: ${event.files ? event.files.length : 0}`);
+      const { event } = body as any;
+      this.logger.debug(
+        `--> [CONTROLLER] Event callback triggered. Type: ${event.type}`,
+      );
+
+      // Handle 'file_shared' event (e.g. forwarded files)
+      if (event.type === 'file_shared') {
+        const fileId = event.file_id || event.file?.id;
+
+        // Safeguard to gracefully ignore empty events instead of crashing
+        if (!fileId) return;
+
+        // Note: Further processing for file_shared would go here if needed.
+        // For now, returning to acknowledge receipt without crashing.
+        return;
+      }
+
+      this.logger.debug(
+        `--> [CONTROLLER] Files attached: ${event.files ? event.files.length : 0}`,
+      );
 
       if (event.type === 'message' && !(event as any).bot_id) {
         const hasText = !!(event.text && event.text.trim().length > 0);
@@ -79,7 +96,7 @@ export class SlackController {
 
         if (hasText || hasFiles) {
           this.logger.log(
-            `Received message event from user "${event.user}" in channel "${event.channel}". Files: ${hasFiles ? event.files!.length : 0}`
+            `Received message event from user "${event.user}" in channel "${event.channel}". Files: ${hasFiles ? event.files!.length : 0}`,
           );
 
           // Fire-and-forget: process asynchronously so we return 200 instantly.

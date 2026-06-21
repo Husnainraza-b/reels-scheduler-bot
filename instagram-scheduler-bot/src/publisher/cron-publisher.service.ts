@@ -27,11 +27,11 @@ interface ContainerStatusResponse {
   status?: string;
 }
 
-const CONTAINER_POLL_INTERVAL_MS = 20_000;   // 20 seconds between polls
-const CONTAINER_MAX_TIMEOUT_MS   = 600_000;  // 10 minute hard timeout
-const MAX_RETRY_COUNT            = 3;        // attempts before reschedule
-const BASE_BACKOFF_DELAY_MS      = 300_000;  // 5 minutes base backoff
-const RATE_LIMIT_POSTS_PER_DAY   = 25;       // Meta daily limit
+const CONTAINER_POLL_INTERVAL_MS = 20_000; // 20 seconds between polls
+const CONTAINER_MAX_TIMEOUT_MS = 600_000; // 10 minute hard timeout
+const MAX_RETRY_COUNT = 3; // attempts before reschedule
+const BASE_BACKOFF_DELAY_MS = 300_000; // 5 minutes base backoff
+const RATE_LIMIT_POSTS_PER_DAY = 25; // Meta daily limit
 
 @Injectable()
 export class CronPublisherService {
@@ -54,7 +54,7 @@ export class CronPublisherService {
       this.configService.get<string>('META_GRAPH_API_VERSION') || 'v20.0';
 
     const slackToken = this.configService.get<string>('SLACK_BOT_TOKEN');
-    this.slackClient  = new WebClient(slackToken || undefined);
+    this.slackClient = new WebClient(slackToken || undefined);
 
     // Alert channel from env — defaults to #general if not set
     this.alertChannel =
@@ -71,7 +71,9 @@ export class CronPublisherService {
    */
   async checkAndPublishActiveQueue(): Promise<void> {
     if (this.isRunning) {
-      this.logger.warn('Publisher already running — skipping duplicate trigger.');
+      this.logger.warn(
+        'Publisher already running — skipping duplicate trigger.',
+      );
       return;
     }
 
@@ -92,7 +94,9 @@ export class CronPublisherService {
    */
   private async cleanupOldPublishedItems(): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(
+      Date.now() - 30 * 24 * 60 * 60 * 1000,
+    ).toISOString();
 
     const { error } = await supabase
       .from('queue')
@@ -101,7 +105,9 @@ export class CronPublisherService {
       .lt('published_at', thirtyDaysAgo);
 
     if (error) {
-      this.logger.warn(`Failed to clean up old published items: ${error.message}`);
+      this.logger.warn(
+        `Failed to clean up old published items: ${error.message}`,
+      );
     } else {
       this.logger.debug('Old published items cleanup completed successfully.');
     }
@@ -191,16 +197,16 @@ export class CronPublisherService {
       }
 
       const item: PublishableItem = {
-        id:                     raw.id,
-        account_id:             raw.account_id,
-        video_url:              raw.video_url,
-        caption:                raw.caption,
-        scheduled_for:          raw.scheduled_for,
-        status:                 raw.status,
-        retry_count:            raw.retry_count ?? 0,
-        username:               account.username,
-        instagram_business_id:  account.instagram_business_id,
-        access_token:           account.access_token,
+        id: raw.id,
+        account_id: raw.account_id,
+        video_url: raw.video_url,
+        caption: raw.caption,
+        scheduled_for: raw.scheduled_for,
+        status: raw.status,
+        retry_count: raw.retry_count ?? 0,
+        username: account.username,
+        instagram_business_id: account.instagram_business_id,
+        access_token: account.access_token,
       };
 
       await this.processItem(item);
@@ -213,9 +219,7 @@ export class CronPublisherService {
   private async processItem(item: PublishableItem): Promise<void> {
     const supabase = this.supabaseService.getClient();
 
-    this.logger.log(
-      `🚀 Processing item "${item.id}" for @${item.username}...`,
-    );
+    this.logger.log(`🚀 Processing item "${item.id}" for @${item.username}...`);
 
     // Lock to 'processing' immediately to prevent double-processing
     const { error: lockError } = await supabase
@@ -225,10 +229,7 @@ export class CronPublisherService {
       .eq('status', 'pending'); // only lock if still pending (safety check)
 
     if (lockError) {
-      this.logger.error(
-        `Failed to lock item "${item.id}".`,
-        lockError.message,
-      );
+      this.logger.error(`Failed to lock item "${item.id}".`, lockError.message);
       return;
     }
 
@@ -255,7 +256,7 @@ export class CronPublisherService {
         await supabase
           .from('queue')
           .update({
-            status:        'pending',
+            status: 'pending',
             scheduled_for: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           })
           .eq('id', item.id);
@@ -267,7 +268,7 @@ export class CronPublisherService {
       if (!iv || !encryptedText) {
         throw new Error(
           'Malformed access token (missing IV:ciphertext format). ' +
-          'Re-save the account credentials via the dashboard.',
+            'Re-save the account credentials via the dashboard.',
         );
       }
       const accessToken = this.encryptionService.decrypt(encryptedText, iv);
@@ -309,14 +310,12 @@ export class CronPublisherService {
       await supabase
         .from('queue')
         .update({
-          status:       'published',
-          published_at: new Date().toISOString(),  // ← critical for rate limit accuracy
+          status: 'published',
+          published_at: new Date().toISOString(), // ← critical for rate limit accuracy
         })
         .eq('id', item.id);
 
-      this.logger.log(
-        `✅ Published item "${item.id}" for @${item.username}!`,
-      );
+      this.logger.log(`✅ Published item "${item.id}" for @${item.username}!`);
 
       try {
         await this.slackClient.chat.postMessage({
@@ -324,7 +323,10 @@ export class CronPublisherService {
           text: `🎉 *SUCCESSFULLY PUBLISHED* 🚀\n\n*Account:* @${item.username}\n*Video:* \`${fileName || 'video.mp4'}\`\n*Queue Item ID:* #${item.id}\n\nThe reel is now live on Instagram!`,
         });
       } catch (slackError) {
-        this.logger.error('Failed to send success alert to Slack', slackError instanceof Error ? slackError.message : String(slackError));
+        this.logger.error(
+          'Failed to send success alert to Slack',
+          slackError instanceof Error ? slackError.message : String(slackError),
+        );
       }
     } catch (error) {
       await this.handlePublishError(item, error);
@@ -365,14 +367,14 @@ export class CronPublisherService {
 
     if (newRetryCount < MAX_RETRY_COUNT) {
       // ─── Still within retry window — backoff and try again ───
-      const backoffMs  = BASE_BACKOFF_DELAY_MS * newRetryCount; // 5min, 10min
-      const retryAt    = new Date(Date.now() + backoffMs).toISOString();
+      const backoffMs = BASE_BACKOFF_DELAY_MS * newRetryCount; // 5min, 10min
+      const retryAt = new Date(Date.now() + backoffMs).toISOString();
 
       await supabase
         .from('queue')
         .update({
-          status:        'pending',
-          retry_count:   newRetryCount,
+          status: 'pending',
+          retry_count: newRetryCount,
           error_message: errorMessage,
           scheduled_for: retryAt,
         })
@@ -393,13 +395,16 @@ export class CronPublisherService {
             `Will retry at ${retryAt}.`,
         });
       } catch (slackError) {
-        this.logger.error('Failed to send retry alert', slackError instanceof Error ? slackError.message : String(slackError));
+        this.logger.error(
+          'Failed to send retry alert',
+          slackError instanceof Error ? slackError.message : String(slackError),
+        );
       }
     } else {
       // ─── Max retries hit — reshuffle queue to next slot ───
       this.logger.warn(
         `⚠️  Item "${item.id}" exhausted ${MAX_RETRY_COUNT} retries. ` +
-        `Reshuffling queue to move to next slot...`,
+          `Reshuffling queue to move to next slot...`,
       );
 
       try {
@@ -407,8 +412,8 @@ export class CronPublisherService {
         const { error: resetError } = await supabase
           .from('queue')
           .update({
-            status:        'pending',
-            retry_count:   0,
+            status: 'pending',
+            retry_count: 0,
             error_message:
               `Rescheduled after ${MAX_RETRY_COUNT} failed attempts. ` +
               `Last error: ${errorMessage.substring(0, 300)}`,
@@ -416,7 +421,9 @@ export class CronPublisherService {
           .eq('id', item.id);
 
         if (resetError) {
-          throw new Error(`Failed to reset item to pending: ${resetError.message}`);
+          throw new Error(
+            `Failed to reset item to pending: ${resetError.message}`,
+          );
         }
 
         // Call the strict Lift and Restack logic to bump everything down
@@ -447,14 +454,14 @@ export class CronPublisherService {
 
         this.logger.error(
           `💀 Item "${item.id}" permanently failed — ` +
-          `could not reshuffle: ${rescheduleMsg}`,
+            `could not reshuffle: ${rescheduleMsg}`,
         );
 
         await supabase
           .from('queue')
           .update({
-            status:        'failed',
-            retry_count:   newRetryCount,
+            status: 'failed',
+            retry_count: newRetryCount,
             error_message: `${errorMessage} | Reshuffle also failed: ${rescheduleMsg}`,
           })
           .eq('id', item.id);
@@ -476,9 +483,9 @@ export class CronPublisherService {
 
     const response = await axios.post<{ id: string }>(url, null, {
       params: {
-        video_url:   videoUrl,
-        caption:     caption,
-        media_type:  'REELS',
+        video_url: videoUrl,
+        caption: caption,
+        media_type: 'REELS',
         access_token: accessToken,
       },
     });
@@ -498,7 +505,7 @@ export class CronPublisherService {
     accessToken: string,
   ): Promise<void> {
     const startTime = Date.now();
-    let pollCount   = 0;
+    let pollCount = 0;
 
     while (Date.now() - startTime < CONTAINER_MAX_TIMEOUT_MS) {
       pollCount++;
@@ -536,7 +543,7 @@ export class CronPublisherService {
     containerId: string,
     accessToken: string,
   ): Promise<ContainerStatusResponse> {
-    const url      = `https://graph.facebook.com/${this.graphApiVersion}/${containerId}`;
+    const url = `https://graph.facebook.com/${this.graphApiVersion}/${containerId}`;
     const response = await axios.get<ContainerStatusResponse>(url, {
       params: { fields: 'status_code,status', access_token: accessToken },
     });
@@ -617,7 +624,7 @@ export class CronPublisherService {
 
   private extractFileNameFromUrl(url: string): string | null {
     try {
-      const parsed   = new URL(url);
+      const parsed = new URL(url);
       const segments = parsed.pathname.split('/');
       return segments[segments.length - 1] || null;
     } catch {

@@ -1,4 +1,18 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Logger, HttpCode, HttpStatus, BadRequestException, UseGuards, ConflictException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Logger,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+  UseGuards,
+  ConflictException,
+} from '@nestjs/common';
 import { SupabaseService } from '../database/supabase.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { AdminAuthGuard } from '../auth/admin-auth.guard';
@@ -28,7 +42,9 @@ export class SlotsController {
   ) {}
 
   @Get('accounts/:accountId/slots')
-  async getSlots(@Param('accountId') accountId: string): Promise<SlotResponse[]> {
+  async getSlots(
+    @Param('accountId') accountId: string,
+  ): Promise<SlotResponse[]> {
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase
@@ -38,8 +54,14 @@ export class SlotsController {
       .order('slot_time', { ascending: true });
 
     if (error) {
-      this.logger.error(`Failed to fetch slots for account ${accountId}.`, error.message);
-      throw new BadRequestException({ error: `Failed to fetch slots: ${error.message}`, code: 'FETCH_FAILED' });
+      this.logger.error(
+        `Failed to fetch slots for account ${accountId}.`,
+        error.message,
+      );
+      throw new BadRequestException({
+        error: `Failed to fetch slots: ${error.message}`,
+        code: 'FETCH_FAILED',
+      });
     }
 
     return (data || []) as SlotResponse[];
@@ -54,10 +76,14 @@ export class SlotsController {
     const { slot_time } = body;
 
     if (!slot_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(slot_time)) {
-      throw new BadRequestException({ error: 'slot_time must be in "HH:MM" or "HH:MM:SS" format', code: 'INVALID_FORMAT' });
+      throw new BadRequestException({
+        error: 'slot_time must be in "HH:MM" or "HH:MM:SS" format',
+        code: 'INVALID_FORMAT',
+      });
     }
 
-    const normalizedTime = slot_time.length === 5 ? `${slot_time}:00` : slot_time;
+    const normalizedTime =
+      slot_time.length === 5 ? `${slot_time}:00` : slot_time;
     const supabase = this.supabaseService.getClient();
 
     // Check duplicate
@@ -69,7 +95,10 @@ export class SlotsController {
       .single();
 
     if (existing) {
-      throw new ConflictException({ error: 'This slot already exists for this account', code: 'SLOT_DUPLICATE' });
+      throw new ConflictException({
+        error: 'This slot already exists for this account',
+        code: 'SLOT_DUPLICATE',
+      });
     }
 
     const { data, error } = await supabase
@@ -80,10 +109,15 @@ export class SlotsController {
 
     if (error) {
       this.logger.error('Failed to create slot.', error.message);
-      throw new BadRequestException({ error: `Failed to create slot: ${error.message}`, code: 'CREATE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to create slot: ${error.message}`,
+        code: 'CREATE_FAILED',
+      });
     }
 
-    this.logger.log(`✅ Slot created for account ${accountId}: ${normalizedTime}. Reshuffling...`);
+    this.logger.log(
+      `✅ Slot created for account ${accountId}: ${normalizedTime}. Reshuffling...`,
+    );
 
     let reshuffled = 0;
     let frozen = 0;
@@ -92,7 +126,10 @@ export class SlotsController {
       reshuffled = res.reshuffled;
       frozen = res.frozen;
     } catch (e) {
-      this.logger.warn(`Queue reshuffle failed.`, e instanceof Error ? e.message : String(e));
+      this.logger.warn(
+        `Queue reshuffle failed.`,
+        e instanceof Error ? e.message : String(e),
+      );
     }
 
     return { slot: data as SlotResponse, reshuffled, frozen };
@@ -111,7 +148,10 @@ export class SlotsController {
       .single();
 
     if (!slotData) {
-      throw new BadRequestException({ error: 'Slot not found', code: 'NOT_FOUND' });
+      throw new BadRequestException({
+        error: 'Slot not found',
+        code: 'NOT_FOUND',
+      });
     }
 
     const { error } = await supabase
@@ -121,7 +161,10 @@ export class SlotsController {
 
     if (error) {
       this.logger.error('Failed to delete slot.', error.message);
-      throw new BadRequestException({ error: `Failed to delete slot: ${error.message}`, code: 'DELETE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to delete slot: ${error.message}`,
+        code: 'DELETE_FAILED',
+      });
     }
 
     this.logger.log(`🗑️ Slot ${slotId} deleted. Reshuffling queue...`);
@@ -129,11 +172,16 @@ export class SlotsController {
     let reshuffled = 0;
     let frozen = 0;
     try {
-      const res = await this.schedulerService.reshuffleQueue(slotData.account_id);
+      const res = await this.schedulerService.reshuffleQueue(
+        slotData.account_id,
+      );
       reshuffled = res.reshuffled;
       frozen = res.frozen;
     } catch (e) {
-      this.logger.warn(`Queue reshuffle failed.`, e instanceof Error ? e.message : String(e));
+      this.logger.warn(
+        `Queue reshuffle failed.`,
+        e instanceof Error ? e.message : String(e),
+      );
     }
 
     return { reshuffled, frozen };
@@ -148,10 +196,14 @@ export class SlotsController {
     const { slot_time } = body;
 
     if (!slot_time || !/^\d{2}:\d{2}(:\d{2})?$/.test(slot_time)) {
-      throw new BadRequestException({ error: 'slot_time must be in "HH:MM" or "HH:MM:SS" format', code: 'INVALID_FORMAT' });
+      throw new BadRequestException({
+        error: 'slot_time must be in "HH:MM" or "HH:MM:SS" format',
+        code: 'INVALID_FORMAT',
+      });
     }
 
-    const normalizedTime = slot_time.length === 5 ? `${slot_time}:00` : slot_time;
+    const normalizedTime =
+      slot_time.length === 5 ? `${slot_time}:00` : slot_time;
     const supabase = this.supabaseService.getClient();
 
     // First get accountId
@@ -162,7 +214,10 @@ export class SlotsController {
       .single();
 
     if (!slotData) {
-      throw new BadRequestException({ error: 'Slot not found', code: 'NOT_FOUND' });
+      throw new BadRequestException({
+        error: 'Slot not found',
+        code: 'NOT_FOUND',
+      });
     }
 
     // Check duplicate
@@ -174,7 +229,10 @@ export class SlotsController {
       .single();
 
     if (existing && existing.id.toString() !== slotId) {
-      throw new ConflictException({ error: 'This slot already exists for this account', code: 'SLOT_DUPLICATE' });
+      throw new ConflictException({
+        error: 'This slot already exists for this account',
+        code: 'SLOT_DUPLICATE',
+      });
     }
 
     const { data, error } = await supabase
@@ -186,7 +244,10 @@ export class SlotsController {
 
     if (error) {
       this.logger.error('Failed to update slot.', error.message);
-      throw new BadRequestException({ error: `Failed to update slot: ${error.message}`, code: 'UPDATE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to update slot: ${error.message}`,
+        code: 'UPDATE_FAILED',
+      });
     }
 
     this.logger.log(`🔄 Slot ${slotId} updated. Reshuffling queue...`);
@@ -194,11 +255,16 @@ export class SlotsController {
     let reshuffled = 0;
     let frozen = 0;
     try {
-      const res = await this.schedulerService.reshuffleQueue(slotData.account_id);
+      const res = await this.schedulerService.reshuffleQueue(
+        slotData.account_id,
+      );
       reshuffled = res.reshuffled;
       frozen = res.frozen;
     } catch (e) {
-      this.logger.warn(`Queue reshuffle failed.`, e instanceof Error ? e.message : String(e));
+      this.logger.warn(
+        `Queue reshuffle failed.`,
+        e instanceof Error ? e.message : String(e),
+      );
     }
 
     return { slot: data as SlotResponse, reshuffled, frozen };

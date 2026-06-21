@@ -61,7 +61,10 @@ export class AccountsController {
 
     if (error) {
       this.logger.error('Failed to fetch accounts.', error.message);
-      throw new BadRequestException({ error: `Failed to fetch accounts: ${error.message}`, code: 'FETCH_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to fetch accounts: ${error.message}`,
+        code: 'FETCH_FAILED',
+      });
     }
 
     return (data || []) as AccountResponse[];
@@ -80,7 +83,11 @@ export class AccountsController {
     }
 
     if (!cleanUsername || !instagram_business_id || !access_token) {
-      throw new BadRequestException({ error: 'username, instagram_business_id, and access_token are all required.', code: 'MISSING_FIELDS' });
+      throw new BadRequestException({
+        error:
+          'username, instagram_business_id, and access_token are all required.',
+        code: 'MISSING_FIELDS',
+      });
     }
 
     if (!access_token.trim()) {
@@ -106,10 +113,15 @@ export class AccountsController {
 
     if (error) {
       this.logger.error('Failed to create account.', error.message);
-      throw new BadRequestException({ error: `Failed to create account: ${error.message}`, code: 'CREATE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to create account: ${error.message}`,
+        code: 'CREATE_FAILED',
+      });
     }
 
-    this.logger.log(`✅ Account created: "${cleanUsername}" (${instagram_business_id})`);
+    this.logger.log(
+      `✅ Account created: "${cleanUsername}" (${instagram_business_id})`,
+    );
     return data as AccountResponse;
   }
 
@@ -125,9 +137,14 @@ export class AccountsController {
       .eq('account_id', id);
 
     if (fetchError) {
-      this.logger.warn(`Failed to fetch queue items for account ${id} before deletion. R2 videos might be orphaned.`, fetchError.message);
+      this.logger.warn(
+        `Failed to fetch queue items for account ${id} before deletion. R2 videos might be orphaned.`,
+        fetchError.message,
+      );
     } else if (queueItems && queueItems.length > 0) {
-      this.logger.log(`Found ${queueItems.length} queued videos for account ${id}. Deleting from R2...`);
+      this.logger.log(
+        `Found ${queueItems.length} queued videos for account ${id}. Deleting from R2...`,
+      );
       for (const item of queueItems) {
         if (item.video_url) {
           const fileName = item.video_url.split('/').pop();
@@ -135,7 +152,10 @@ export class AccountsController {
             try {
               await this.cloudflareR2Service.deleteVideo(fileName);
             } catch (err) {
-              this.logger.warn(`Could not delete video ${fileName} from R2 during account deletion. Skipping.`, err);
+              this.logger.warn(
+                `Could not delete video ${fileName} from R2 during account deletion. Skipping.`,
+                err,
+              );
             }
           }
         }
@@ -143,14 +163,14 @@ export class AccountsController {
     }
 
     // 2. Delete the account (which cascade-deletes the queue rows)
-    const { error } = await supabase
-      .from('accounts')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
 
     if (error) {
       this.logger.error(`Failed to delete account ${id}.`, error.message);
-      throw new BadRequestException({ error: `Failed to delete account: ${error.message}`, code: 'DELETE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to delete account: ${error.message}`,
+        code: 'DELETE_FAILED',
+      });
     }
 
     this.logger.log(`🗑️  Account "${id}" and all associated videos deleted.`);
@@ -167,17 +187,24 @@ export class AccountsController {
 
     const updates: Record<string, any> = {};
     if (username !== undefined) {
-      updates.username = username.startsWith('@') ? username.substring(1) : username;
+      updates.username = username.startsWith('@')
+        ? username.substring(1)
+        : username;
     }
-    if (instagram_business_id !== undefined) updates.instagram_business_id = instagram_business_id;
+    if (instagram_business_id !== undefined)
+      updates.instagram_business_id = instagram_business_id;
 
     if (access_token) {
-      const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
+      const { encryptedText, iv } =
+        this.encryptionService.encrypt(access_token);
       updates.access_token = `${iv}:${encryptedText}`;
     }
 
     if (Object.keys(updates).length === 0) {
-      throw new BadRequestException({ error: 'No fields provided to update.', code: 'NO_UPDATES' });
+      throw new BadRequestException({
+        error: 'No fields provided to update.',
+        code: 'NO_UPDATES',
+      });
     }
 
     const supabase = this.supabaseService.getClient();
@@ -191,10 +218,15 @@ export class AccountsController {
 
     if (error) {
       this.logger.error(`Failed to update account ${id}.`, error.message);
-      throw new BadRequestException({ error: `Failed to update account: ${error.message}`, code: 'UPDATE_FAILED' });
+      throw new BadRequestException({
+        error: `Failed to update account: ${error.message}`,
+        code: 'UPDATE_FAILED',
+      });
     }
 
-    this.logger.log(`🔄 Account updated: "${data.username}" (${data.instagram_business_id})`);
+    this.logger.log(
+      `🔄 Account updated: "${data.username}" (${data.instagram_business_id})`,
+    );
     return data as AccountResponse;
   }
 
@@ -205,7 +237,10 @@ export class AccountsController {
     @Body('status') status: 'active' | 'paused',
   ): Promise<AccountResponse> {
     if (status !== 'active' && status !== 'paused') {
-      throw new BadRequestException({ error: 'Invalid status', code: 'INVALID_STATUS' });
+      throw new BadRequestException({
+        error: 'Invalid status',
+        code: 'INVALID_STATUS',
+      });
     }
 
     const supabase = this.supabaseService.getClient();
@@ -218,17 +253,28 @@ export class AccountsController {
       .single();
 
     if (error) {
-      this.logger.error(`Failed to toggle queue for account ${id}.`, error.message);
-      throw new BadRequestException({ error: `Failed to toggle queue: ${error.message}`, code: 'UPDATE_FAILED' });
+      this.logger.error(
+        `Failed to toggle queue for account ${id}.`,
+        error.message,
+      );
+      throw new BadRequestException({
+        error: `Failed to toggle queue: ${error.message}`,
+        code: 'UPDATE_FAILED',
+      });
     }
 
-    this.logger.log(`🔄 Account queue toggled: "${data.username}" -> ${status}`);
+    this.logger.log(
+      `🔄 Account queue toggled: "${data.username}" -> ${status}`,
+    );
 
     if (status === 'active') {
       try {
         await this.schedulerService.reshuffleQueue(id);
       } catch (err) {
-        this.logger.error(`Failed to reshuffle queue for account ${id} after resuming`, err instanceof Error ? err.stack : String(err));
+        this.logger.error(
+          `Failed to reshuffle queue for account ${id} after resuming`,
+          err instanceof Error ? err.stack : String(err),
+        );
       }
     }
 
