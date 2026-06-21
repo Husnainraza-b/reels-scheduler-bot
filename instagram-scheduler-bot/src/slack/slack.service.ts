@@ -220,11 +220,14 @@ export class SlackService {
         );
 
         // --- Send confirmation to Slack ---
+        const isPaused = queueRecord.scheduled_for.startsWith('2099');
+        const displayDate = isPaused ? 'Unscheduled (Queue Paused)' : queueRecord.scheduled_for;
+
         await this.webClient.chat.postMessage({
           channel: event.channel,
           text:
             `✅ *Video queued for @${username}!*\n\n` +
-            `📅 Scheduled: ${queueRecord.scheduled_for}\n` +
+            `📅 Scheduled: ${displayDate}\n` +
             `📝 Caption: ${caption || '(none)'}\n` +
             `🎬 File: \`${uniqueFileName}\``,
         });
