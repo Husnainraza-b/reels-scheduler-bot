@@ -240,7 +240,7 @@ export default function QueueStream({
                 )}
 
                 {/* Header: Time + Status + Actions */}
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-wrap gap-y-3 gap-x-4 items-center justify-between mb-3">
                   <div className="flex items-baseline gap-3">
                     <span className={`${statusCfg.isActive ? 'text-2xl font-normal text-text-primary' : 'text-xl text-text-secondary/80'}`}>
                       {formatPKT(item.scheduled_for)}
@@ -250,9 +250,9 @@ export default function QueueStream({
                     </span>
                   </div>
 
-                  {/* Hover Actions */}
+                  {/* Actions (Always visible on mobile, hover on desktop) */}
                   {(item.status === 'pending' || item.status === 'failed') && editingId !== item.id && (
-                    <div className={`flex items-center gap-2 transition-opacity duration-300 ${pendingDeleteId === item.id ? 'opacity-100 z-20' : 'opacity-0 group-hover:opacity-100 z-20'}`}>
+                    <div className={`flex items-center gap-2 transition-opacity duration-300 ${pendingDeleteId === item.id ? 'opacity-100 z-20' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 z-20'}`}>
                       {pendingDeleteId === item.id ? (
                         <div className="flex items-center gap-3 bg-surface-card px-3 py-1 rounded border border-danger/30">
                           <span className="text-xs text-text-secondary">Delete?</span>
