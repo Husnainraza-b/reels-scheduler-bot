@@ -19,7 +19,7 @@ export class FacebookPublisher implements PlatformPublisher {
     }
 
     const headResponse = await axios.head(item.video_url);
-    const contentLength = parseInt(headResponse.headers['content-length'] || '0', 10);
+    const contentLength = parseInt(String(headResponse.headers['content-length'] || '0'), 10);
     const sizeInMB = contentLength / (1024 * 1024);
 
     this.logger.log(`[FB] File size is ${sizeInMB.toFixed(2)} MB`);

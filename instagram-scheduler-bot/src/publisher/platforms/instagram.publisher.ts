@@ -20,7 +20,7 @@ export class InstagramPublisher implements PlatformPublisher {
 
     // 1. Get File Size via HEAD request to R2
     const headResponse = await axios.head(item.video_url);
-    const contentLength = parseInt(headResponse.headers['content-length'] || '0', 10);
+    const contentLength = parseInt(String(headResponse.headers['content-length'] || '0'), 10);
     const sizeInMB = contentLength / (1024 * 1024);
 
     this.logger.log(`[IG] File size is ${sizeInMB.toFixed(2)} MB`);

@@ -216,7 +216,7 @@ export class CronPublisherService {
 
       const newPublished = new Set(published);
       const failures: { platform: string; reason: any }[] = [];
-      const newVerifying: Record<string, { media_id: string; status: string }> = item.platform_metadata || {};
+      const newVerifying: Record<string, any> = item.platform_metadata || {};
       let hasVerifying = false;
 
       for (const result of results) {
