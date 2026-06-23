@@ -66,29 +66,38 @@ export class CronPublisherService {
 
   private async cleanupOldFailedItems(): Promise<void> {
     const supabase = this.supabaseService.getClient();
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: oldFailedItems } = await supabase
+    // 1. Delete MP4 from R2 for permanently failed items older than 2 days
+    const { data: r2CleanupItems } = await supabase
       .from('queue')
       .select('id, video_url')
-      .eq('status', 'pending')
-      .eq('scheduled_for', '2099-12-31T23:59:59.000Z')
-      .lt('updated_at', sevenDaysAgo);
+      .eq('status', 'failed')
+      .not('video_url', 'is', null)
+      .lt('updated_at', twoDaysAgo);
 
-    if (oldFailedItems && oldFailedItems.length > 0) {
-      for (const item of oldFailedItems) {
+    if (r2CleanupItems && r2CleanupItems.length > 0) {
+      for (const item of r2CleanupItems) {
         if (item.video_url) {
           const fileName = this.extractFileNameFromUrl(item.video_url);
           if (fileName) {
             try {
               await this.cloudflareR2Service.deleteVideo(fileName);
+              // Mark the video_url as null so we don't try to delete it again
+              await supabase.from('queue').update({ video_url: null }).eq('id', item.id);
             } catch (err) {}
           }
         }
       }
-      const ids = oldFailedItems.map((i) => i.id);
-      await supabase.from('queue').delete().in('id', ids);
     }
+
+    // 2. Delete the database rows entirely for permanently failed items older than 30 days
+    await supabase
+      .from('queue')
+      .delete()
+      .eq('status', 'failed')
+      .lt('updated_at', thirtyDaysAgo);
   }
 
   private async recoverStuckItems(): Promise<void> {
@@ -172,15 +181,15 @@ export class CronPublisherService {
     try {
       // Set of already published platforms
       const published = new Set(item.published_platforms);
-      const tasks: Promise<{ platform: string; status: 'fulfilled' | 'rejected'; reason?: any }>[] = [];
+      const tasks: Promise<{ platform: string; status: 'fulfilled' | 'rejected'; reason?: any; verifying?: boolean; media_id?: string }>[] = [];
       const attemptedPlatforms: string[] = [];
 
       if (item.platforms_enabled.instagram && !published.has('instagram')) {
-        tasks.push(this.instagramPublisher.publish(item).then(() => ({ platform: 'instagram', status: 'fulfilled' as const })).catch((err) => ({ platform: 'instagram', status: 'rejected' as const, reason: err })));
+        tasks.push(this.instagramPublisher.publish(item).then((res: any) => ({ platform: 'instagram', status: 'fulfilled' as const, verifying: res?.status === 'verifying', media_id: res?.media_id })).catch((err) => ({ platform: 'instagram', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('Instagram');
       }
       if (item.platforms_enabled.facebook && !published.has('facebook')) {
-        tasks.push(this.facebookPublisher.publish(item).then(() => ({ platform: 'facebook', status: 'fulfilled' as const })).catch((err) => ({ platform: 'facebook', status: 'rejected' as const, reason: err })));
+        tasks.push(this.facebookPublisher.publish(item).then((res: any) => ({ platform: 'facebook', status: 'fulfilled' as const, verifying: res?.status === 'verifying', media_id: res?.media_id })).catch((err) => ({ platform: 'facebook', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('Facebook');
       }
       if (item.platforms_enabled.tiktok && !published.has('tiktok')) {
@@ -207,10 +216,17 @@ export class CronPublisherService {
 
       const newPublished = new Set(published);
       const failures: { platform: string; reason: any }[] = [];
+      const newVerifying: Record<string, { media_id: string; status: string }> = item.platform_metadata || {};
+      let hasVerifying = false;
 
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          newPublished.add(result.platform);
+          if (result.verifying && result.media_id) {
+            newVerifying[result.platform] = { media_id: result.media_id, status: 'verifying' };
+            hasVerifying = true;
+          } else {
+            newPublished.add(result.platform);
+          }
         } else {
           failures.push({ platform: result.platform, reason: result.reason });
         }
@@ -223,7 +239,10 @@ export class CronPublisherService {
         // If there are failures, save the newly successful platforms to DB, then throw error to trigger retry
         await supabase
           .from('queue')
-          .update({ published_platforms: Array.from(newPublished) })
+          .update({ 
+            published_platforms: Array.from(newPublished),
+            platform_metadata: newVerifying 
+          })
           .eq('id', item.id);
         
         // Update the item in memory so handlePublishError knows what succeeded
@@ -235,9 +254,9 @@ export class CronPublisherService {
         throw err;
       }
 
-      // If we reach here, ALL newly attempted platforms succeeded!
-      // Delete from R2 only if ALL enabled platforms are now successfully published
-      if (allPublished) {
+      // If we reach here, ALL newly attempted platforms succeeded (either published or verifying)!
+      // Delete from R2 only if ALL enabled platforms are now successfully published AND there are no verifying platforms
+      if (allPublished && !hasVerifying) {
         const fileName = this.extractFileNameFromUrl(item.video_url);
         if (fileName) {
           try {
@@ -249,9 +268,10 @@ export class CronPublisherService {
       await supabase
         .from('queue')
         .update({
-          status: allPublished ? 'published' : 'pending', // Failsafe, should always be allPublished here
+          status: hasVerifying ? 'verifying' : (allPublished ? 'published' : 'pending'),
           published_platforms: Array.from(newPublished),
-          published_at: allPublished ? new Date().toISOString() : null,
+          platform_metadata: newVerifying,
+          published_at: (allPublished && !hasVerifying) ? new Date().toISOString() : null,
         })
         .eq('id', item.id);
 
@@ -298,21 +318,25 @@ export class CronPublisherService {
         });
       } catch {}
     } else {
-      const unscheduledDate = '2099-12-31T23:59:59.000Z';
       await supabase
         .from('queue')
         .update({
           status: 'pending',
           retry_count: 0,
-          scheduled_for: unscheduledDate,
-          error_message: `Unscheduled after ${MAX_RETRY_COUNT} attempts. Last error: ${errorMessage.substring(0, 300)}`,
+          error_message: `Rescheduled after ${MAX_RETRY_COUNT} consecutive attempts. Last error: ${errorMessage.substring(0, 300)}`,
         })
         .eq('id', item.id);
 
       try {
+        await this.schedulerService.reshuffleQueue(item.account_id);
+      } catch (reshuffleError) {
+        this.logger.error(`Failed to trigger Lift and Restack for account ${item.account_id} after standard failures`, reshuffleError);
+      }
+
+      try {
         await this.slackClient.chat.postMessage({
           channel: this.alertChannel,
-          text: `🚨 *PERMANENT FAILURE / UNSCHEDULED* — Queue item #${item.id}\n\n*Account:* @${item.username}${failedPlatformsText}${successPlatformsText}\n*Error:* \`${errorMessage.substring(0, 500)}\`\n\nThis item is marked as Unscheduled (2099).`,
+          text: `🔄 *PUBLISH RESCHEDULED* — Queue item #${item.id}\n\n*Account:* @${item.username}${failedPlatformsText}${successPlatformsText}\n*Error:* \`${errorMessage.substring(0, 500)}\`\n\nThis item has exhausted its consecutive retries and has been pushed back into the active queue. The remaining schedule has been automatically reshuffled.`,
         });
       } catch {}
     }

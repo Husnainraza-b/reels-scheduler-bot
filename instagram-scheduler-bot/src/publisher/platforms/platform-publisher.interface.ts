@@ -23,6 +23,7 @@ export interface PublishableItem {
   twitter_access_token?: string;
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
+  platform_metadata?: Record<string, { media_id?: string; status?: string }>;
 }
 
 export interface PlatformPublisher {
@@ -35,5 +36,5 @@ export interface PlatformPublisher {
    * Publishes the video to the platform.
    * Should throw an Error if publishing fails.
    */
-  publish(item: PublishableItem): Promise<void>;
+  publish(item: PublishableItem): Promise<void | { status: 'verifying'; media_id: string }>;
 }

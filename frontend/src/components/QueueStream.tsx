@@ -52,6 +52,12 @@ const STATUS_CONFIG: Record<
     badgeClass: 'bg-text-muted/10 text-text-muted border border-text-muted/20',
     isActive: false,
   },
+  failed: {
+    label: 'Failed',
+    dotClass: 'bg-danger border-[3px] border-surface animate-pulse',
+    badgeClass: 'bg-danger/10 text-danger border border-danger/20 font-bold',
+    isActive: true,
+  },
 };
 
 function formatPKT(utcTimestamp: string | null): string {
@@ -107,7 +113,13 @@ export default function QueueStream({
   }, [pendingDeleteId]);
 
   useEffect(() => {
-    setLocalQueueItems(queueItems);
+    // Sort failed items to the absolute top
+    const sorted = [...queueItems].sort((a, b) => {
+      if (a.status === 'failed' && b.status !== 'failed') return -1;
+      if (b.status === 'failed' && a.status !== 'failed') return 1;
+      return 0; // maintain existing order
+    });
+    setLocalQueueItems(sorted);
   }, [queueItems]);
 
   const handleEditClick = (item: QueueItem) => {
@@ -217,6 +229,15 @@ export default function QueueStream({
               >
                 {/* Timeline Dot */}
                 <div className={`absolute -left-[37px] top-2 w-3 h-3 rounded-full ${statusCfg.dotClass}`} />
+                
+                {/* Permanently Failed Red Alert Banner */}
+                {item.status === 'failed' && (
+                  <div className="absolute inset-0 z-10 pointer-events-none flex flex-col items-center justify-center top-8">
+                    <div className="bg-danger text-surface font-black text-xl px-4 py-1 rounded shadow-2xl transform -rotate-6 border-2 border-surface tracking-wider pointer-events-auto">
+                      PERMANENTLY FAILED
+                    </div>
+                  </div>
+                )}
 
                 {/* Header: Time + Status + Actions */}
                 <div className="flex items-center justify-between mb-3">
@@ -230,8 +251,8 @@ export default function QueueStream({
                   </div>
 
                   {/* Hover Actions */}
-                  {item.status === 'pending' && editingId !== item.id && (
-                    <div className={`flex items-center gap-2 transition-opacity duration-300 ${pendingDeleteId === item.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                  {(item.status === 'pending' || item.status === 'failed') && editingId !== item.id && (
+                    <div className={`flex items-center gap-2 transition-opacity duration-300 ${pendingDeleteId === item.id ? 'opacity-100 z-20' : 'opacity-0 group-hover:opacity-100 z-20'}`}>
                       {pendingDeleteId === item.id ? (
                         <div className="flex items-center gap-3 bg-surface-card px-3 py-1 rounded border border-danger/30">
                           <span className="text-xs text-text-secondary">Delete?</span>

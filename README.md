@@ -63,18 +63,21 @@ This document serves as the absolute single source of truth for the entire Socia
   3. It locks these rows by updating their status to `processing`.
   4. It dynamically checks the `platforms_enabled` JSON settings for the account (e.g., checking if Instagram, Facebook, TikTok, X, and YouTube are toggled on).
   5. It runs the platform-specific publishers **concurrently** via `Promise.all` to save time.
-  6. **Partial-Success & Intelligent Retry Logic:** If a video succeeds on YouTube but fails on TikTok, the system records YouTube as a "success" in a `published_platforms` array. The item is returned to the queue as `pending`. On the *next* retry, the system skips YouTube entirely and only attempts to post to TikTok.
-  7. Upon successful publish to *all* enabled platforms, the item's status is changed to `published`.
-  8. Once totally published, the large MP4 video file is instantly deleted from Cloudflare R2 to conserve storage space.
+  6. **Meta Resumable Uploads & Hand-off:** For Facebook and Instagram, the system dynamically checks the video file size on Cloudflare R2 via an HTTP `HEAD` request. If it exceeds 50MB, it initiates a 3-step Resumable Upload API flow (`start`, `transfer`, `finish`) to handle massive files smoothly. Upon Meta accepting the video, instead of blocking the event loop to poll for completion, the item's status is gracefully updated to `verifying` and the `media_id` is stored.
+  7. **Asynchronous Verification Poller:** A dedicated background cron job ticks every 5 minutes, scanning the database for items in the `verifying` state. It asynchronously pings Meta's status endpoints, and once the platform confirms the video is fully processed, it finalizes the row.
+  8. **Partial-Success & Intelligent Retry Logic:** If a video succeeds on YouTube but fails on TikTok, the system records YouTube as a "success" in a `published_platforms` array. The item is returned to the queue as `pending`. On the *next* retry, the system skips YouTube entirely and only attempts to post to TikTok.
+  9. Upon successful publish to *all* enabled platforms, the item's status is changed to `published`.
+  10. Once totally published, the large MP4 video file is instantly deleted from Cloudflare R2 to conserve storage space.
 
 ### 5. Resilient Error Handling & Retry Logic
 **Goal:** Ensure temporary API glitches don't ruin the posting schedule, and permanently failed videos don't block the queue.
 - **Flow:**
   1. If publishing fails on one or more platforms, the system implements exponential backoff, retrying the failed platforms up to 3 times (with 5-minute, 10-minute, etc. delays).
   2. A real-time failure alert is sent to a configured Slack channel detailing exactly which platform failed.
-  3. If all retries are exhausted, the item's schedule is shifted to the year 2099 to effectively "unschedule" it, preserving its data so it can be manually rescued while preventing it from forever clogging the active queue processing.
-  4. A final "unscheduled" alert is sent to Slack.
-  5. A secondary cleanup cron job securely deletes unscheduled "failed" items older than 7 days, purging the R2 video.
+  3. If all 3 standard API retries are exhausted, the item's retry count is reset to 0 and the system instantly triggers a **"Lift and Restack"**. This pulls the video forward into the very next available slot to try again, while perfectly reshuffling all subsequent videos to fill the schedule.
+  4. A "rescheduled" alert is sent to Slack.
+  5. **Permanent Failures:** If a video is explicitly rejected by Meta *during the async verification phase* (e.g. copyright violation or corrupted format), it completely bypasses standard retries. It is permanently marked as `failed`, sorted to the absolute top of the Live Queue dashboard with a red "PERMANENTLY FAILED" banner, and a custom Slack alert is fired.
+  6. **Automated Cleanups:** A background cron job securely deletes the Cloudflare R2 MP4 file for permanently failed items older than 2 days, and entirely purges their database rows after 30 days to keep the system clean.
 
 ### 6. Analytics & Runway Tracking
 **Goal:** Give admins a bird's-eye view of account health and content buffers.
@@ -88,6 +91,13 @@ This document serves as the absolute single source of truth for the entire Socia
   1. Admins can toggle an account's `queue_status` to `paused`.
   2. The Cron Publisher instantly respects this flag and skips processing any pending videos for that account until it is resumed.
 
+### 8. Multi-Platform Token Expiry Monitoring
+**Goal:** Prevent publishing failures caused by silently expiring API access tokens.
+- **Flow:**
+  1. A background cron job runs every Monday at 9 AM.
+  2. It scans all accounts and checks the JSON-stored Unix expiration timestamps (`token_expiries`) for all linked platforms.
+  3. If any token is set to expire within 7 days, it fires a warning alert to the configured Slack channel, prompting the user to refresh the token via the dashboard.
+
 ---
 
 ## 💾 Data Schema & Models
@@ -99,6 +109,7 @@ Stores the social media accounts connected to the system.
 - `platforms_enabled` (JSONB) - Tracks which platforms the account broadcasts to.
 - `instagram_business_id`, `facebook_page_id` (TEXT)
 - `access_token`, `tiktok_access_token`, `twitter_access_token`, `twitter_access_secret`, `youtube_refresh_token` (TEXT) - Highly sensitive API tokens. **Stored Encrypted**.
+- `token_expiries` (JSONB) - A key-value map tracking Unix expiration timestamps for all platform tokens.
 - `queue_status` (TEXT) - Can be `active` or `paused`.
 
 ### 2. `posting_slots` Table
@@ -114,8 +125,9 @@ The central nervous system tracking every video.
 - `video_url` (TEXT) - The public Cloudflare R2 URL.
 - `caption` (TEXT) - The text to be posted alongside the reel.
 - `scheduled_for` (TIMESTAMPTZ) - The exact moment this video should go live.
-- `status` (TEXT) - Can be: `pending`, `calculating`, `processing`, `published`, or `failed`.
+- `status` (TEXT) - Can be: `pending`, `calculating`, `processing`, `verifying`, `published`, or `failed`.
 - `published_platforms` (JSONB) - An array storing partial successes (e.g. `['youtube', 'instagram']`) so the system knows what to skip upon retrying.
+- `platform_metadata` (JSONB) - Stores platform-specific states, such as `media_id` tracking for the asynchronous Verification Poller.
 - `slack_file_id` (TEXT) - To trace the video back to the original Slack message.
 
 ---

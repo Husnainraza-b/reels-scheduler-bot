@@ -42,7 +42,7 @@ export class QueueController {
       .from('queue')
       .select('*')
       .eq('account_id', accountId)
-      .in('status', ['pending', 'processing', 'rescheduling'])
+      .in('status', ['pending', 'processing', 'rescheduling', 'failed'])
       .order('scheduled_for', { ascending: true });
 
     if (error) {

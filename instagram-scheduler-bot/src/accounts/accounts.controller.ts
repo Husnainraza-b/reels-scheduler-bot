@@ -36,6 +36,7 @@ interface CreateAccountDto {
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
   platforms_enabled: PlatformsEnabled;
+  token_expiries?: Record<string, number>;
 }
 
 interface UpdateAccountDto {
@@ -48,6 +49,7 @@ interface UpdateAccountDto {
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
   platforms_enabled?: PlatformsEnabled;
+  token_expiries?: Record<string, number>;
 }
 
 interface AccountResponse {
@@ -58,6 +60,7 @@ interface AccountResponse {
   platforms_enabled: PlatformsEnabled;
   created_at: string;
   queue_status: string;
+  token_expiries?: Record<string, number>;
 }
 
 @Controller('dashboard/accounts')
@@ -106,7 +109,8 @@ export class AccountsController {
       tiktok_access_token,
       twitter_access_token,
       twitter_access_secret,
-      youtube_refresh_token
+      youtube_refresh_token,
+      token_expiries
     } = body;
 
     let cleanUsername = username;
@@ -126,7 +130,8 @@ export class AccountsController {
       queue_status: 'active',
       platforms_enabled,
       instagram_business_id,
-      facebook_page_id
+      facebook_page_id,
+      token_expiries
     };
 
     if (access_token?.trim()) {
@@ -239,7 +244,8 @@ export class AccountsController {
       twitter_access_token,
       twitter_access_secret,
       youtube_refresh_token,
-      platforms_enabled
+      platforms_enabled,
+      token_expiries
     } = body;
 
     const updates: Record<string, any> = {};
@@ -250,6 +256,7 @@ export class AccountsController {
     if (instagram_business_id !== undefined) updates.instagram_business_id = instagram_business_id;
     if (facebook_page_id !== undefined) updates.facebook_page_id = facebook_page_id;
     if (platforms_enabled !== undefined) updates.platforms_enabled = platforms_enabled;
+    if (token_expiries !== undefined) updates.token_expiries = token_expiries;
 
     if (access_token?.trim()) {
       const { encryptedText, iv } = this.encryptionService.encrypt(access_token);

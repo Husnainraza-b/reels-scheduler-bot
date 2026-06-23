@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PublisherController } from './publisher.controller';
 import { CronPublisherService } from './cron-publisher.service';
+import { VerificationPollerService } from './verification-poller.service';
 import { DatabaseModule } from '../database/database.module';
 import { CryptoModule } from '../crypto/crypto.module';
 import { StorageModule } from '../storage/storage.module';
@@ -21,7 +22,8 @@ import { YoutubePublisher } from './platforms/youtube.publisher';
     FacebookPublisher,
     TiktokPublisher,
     TwitterPublisher,
-    YoutubePublisher
+    YoutubePublisher,
+    VerificationPollerService
   ],
 })
 export class PublisherModule {}

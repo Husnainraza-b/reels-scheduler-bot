@@ -61,6 +61,7 @@ export interface Account {
   platforms_enabled: PlatformsEnabled;
   created_at: string;
   queue_status: string;
+  token_expiries?: Record<string, number>;
 }
 
 export interface PostingSlot {
@@ -79,6 +80,7 @@ export interface QueueItem {
   published_platforms?: string[];
   slack_file_id: string | null;
   created_at: string;
+  platform_metadata?: Record<string, { media_id?: string; status?: string }>;
 }
 
 // ─── Auth Endpoints ───
