@@ -206,13 +206,13 @@ export class CronPublisherService {
       const results = await Promise.all(tasks);
 
       const newPublished = new Set(published);
-      const failures: any[] = [];
+      const failures: { platform: string; reason: any }[] = [];
 
       for (const result of results) {
         if (result.status === 'fulfilled') {
           newPublished.add(result.platform);
         } else {
-          failures.push(result.reason);
+          failures.push({ platform: result.platform, reason: result.reason });
         }
       }
 
@@ -225,9 +225,14 @@ export class CronPublisherService {
           .from('queue')
           .update({ published_platforms: Array.from(newPublished) })
           .eq('id', item.id);
+        
+        // Update the item in memory so handlePublishError knows what succeeded
+        item.published_platforms = Array.from(newPublished);
 
-        const errorMessages = failures.map((f) => (f instanceof Error ? f.message : String(f)));
-        throw new Error(`Platforms failed: ${errorMessages.join(' | ')}`);
+        const errorMessages = failures.map((f) => `[${f.platform.toUpperCase()}] ${f.reason instanceof Error ? f.reason.message : String(f.reason)}`);
+        const err = new Error(errorMessages.join(' | '));
+        (err as any).failedPlatforms = failures.map((f) => f.platform).join(', ');
+        throw err;
       }
 
       // If we reach here, ALL newly attempted platforms succeeded!
@@ -269,6 +274,9 @@ export class CronPublisherService {
 
     this.logger.error(`❌ Item "${item.id}" failed (attempt ${newRetryCount}/${MAX_RETRY_COUNT}).`, errorMessage);
 
+    const failedPlatformsText = (error as any)?.failedPlatforms ? `\n*Failed On:* ${(error as any).failedPlatforms}` : '';
+    const successPlatformsText = item.published_platforms && item.published_platforms.length > 0 ? `\n*Succeeded On:* ${item.published_platforms.join(', ')}` : '';
+
     if (newRetryCount < MAX_RETRY_COUNT) {
       const backoffMs = BASE_BACKOFF_DELAY_MS * newRetryCount;
       const retryAt = new Date(Date.now() + backoffMs).toISOString();
@@ -286,7 +294,7 @@ export class CronPublisherService {
       try {
         await this.slackClient.chat.postMessage({
           channel: this.alertChannel,
-          text: `⚠️ *PUBLISH FAILED (Attempt ${newRetryCount}/${MAX_RETRY_COUNT})* — Queue item #${item.id}\n\n*Account:* @${item.username}\n*Error:* \`${errorMessage.substring(0, 300)}\`\n\nWill retry at ${retryAt}.`,
+          text: `⚠️ *PUBLISH FAILED (Attempt ${newRetryCount}/${MAX_RETRY_COUNT})* — Queue item #${item.id}\n\n*Account:* @${item.username}${failedPlatformsText}${successPlatformsText}\n*Error:* \`${errorMessage.substring(0, 300)}\`\n\nWill retry at ${retryAt}.`,
         });
       } catch {}
     } else {
@@ -304,7 +312,7 @@ export class CronPublisherService {
       try {
         await this.slackClient.chat.postMessage({
           channel: this.alertChannel,
-          text: `🚨 *PERMANENT FAILURE / UNSCHEDULED* — Queue item #${item.id}\n\n*Account:* @${item.username}\n*Error:* \`${errorMessage.substring(0, 500)}\`\n\nThis item is marked as Unscheduled (2099).`,
+          text: `🚨 *PERMANENT FAILURE / UNSCHEDULED* — Queue item #${item.id}\n\n*Account:* @${item.username}${failedPlatformsText}${successPlatformsText}\n*Error:* \`${errorMessage.substring(0, 500)}\`\n\nThis item is marked as Unscheduled (2099).`,
         });
       } catch {}
     }
