@@ -41,10 +41,24 @@ api.interceptors.response.use(
 
 // ─── Types (aligned to actual DB schema) ───
 
+export interface PlatformsEnabled {
+  instagram: boolean;
+  facebook: boolean;
+  tiktok: boolean;
+  x: boolean;
+  youtube: boolean;
+}
+
 export interface Account {
   id: number;
   username: string;
   instagram_business_id: string;
+  facebook_page_id?: string | null;
+  tiktok_access_token?: string | null;
+  twitter_access_token?: string | null;
+  twitter_access_secret?: string | null;
+  youtube_refresh_token?: string | null;
+  platforms_enabled: PlatformsEnabled;
   created_at: string;
   queue_status: string;
 }
@@ -94,8 +108,14 @@ export async function getAccounts(): Promise<Account[]> {
 
 export async function createAccount(payload: {
   username: string;
-  instagram_business_id: string;
-  access_token: string;
+  instagram_business_id?: string;
+  facebook_page_id?: string;
+  access_token?: string; // used for Meta (FB/IG)
+  tiktok_access_token?: string;
+  twitter_access_token?: string;
+  twitter_access_secret?: string;
+  youtube_refresh_token?: string;
+  platforms_enabled: PlatformsEnabled;
 }): Promise<Account> {
   const { data } = await api.post<Account>('/dashboard/accounts', payload);
   return data;
@@ -103,11 +123,17 @@ export async function createAccount(payload: {
 
 export async function updateAccount(
   id: number,
-  payload: {
-    username?: string;
-    instagram_business_id?: string;
-    access_token?: string;
-  }
+  payload: Partial<{
+    username: string;
+    instagram_business_id: string;
+    facebook_page_id: string;
+    access_token: string;
+    tiktok_access_token: string;
+    twitter_access_token: string;
+    twitter_access_secret: string;
+    youtube_refresh_token: string;
+    platforms_enabled: PlatformsEnabled;
+  }>
 ): Promise<Account> {
   const { data } = await api.patch<Account>(`/dashboard/accounts/${id}`, payload);
   return data;

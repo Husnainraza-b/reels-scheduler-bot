@@ -18,22 +18,44 @@ import { AdminAuthGuard } from '../auth/admin-auth.guard';
 import { CloudflareR2Service } from '../storage/cloudflare-r2.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 
+interface PlatformsEnabled {
+  instagram: boolean;
+  facebook: boolean;
+  tiktok: boolean;
+  x: boolean;
+  youtube: boolean;
+}
+
 interface CreateAccountDto {
   username: string;
-  instagram_business_id: string;
-  access_token: string;
+  instagram_business_id?: string;
+  facebook_page_id?: string;
+  access_token?: string;
+  tiktok_access_token?: string;
+  twitter_access_token?: string;
+  twitter_access_secret?: string;
+  youtube_refresh_token?: string;
+  platforms_enabled: PlatformsEnabled;
 }
 
 interface UpdateAccountDto {
   username?: string;
   instagram_business_id?: string;
+  facebook_page_id?: string;
   access_token?: string;
+  tiktok_access_token?: string;
+  twitter_access_token?: string;
+  twitter_access_secret?: string;
+  youtube_refresh_token?: string;
+  platforms_enabled?: PlatformsEnabled;
 }
 
 interface AccountResponse {
   id: number;
   username: string;
-  instagram_business_id: string;
+  instagram_business_id?: string;
+  facebook_page_id?: string;
+  platforms_enabled: PlatformsEnabled;
   created_at: string;
   queue_status: string;
 }
@@ -56,7 +78,7 @@ export class AccountsController {
 
     const { data, error } = await supabase
       .from('accounts')
-      .select('id, username, instagram_business_id, created_at, queue_status')
+      .select('id, username, instagram_business_id, facebook_page_id, platforms_enabled, created_at, queue_status')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -75,40 +97,65 @@ export class AccountsController {
   async createAccount(
     @Body() body: CreateAccountDto,
   ): Promise<AccountResponse> {
-    const { username, instagram_business_id, access_token } = body;
+    const { 
+      username, 
+      platforms_enabled,
+      instagram_business_id, 
+      facebook_page_id,
+      access_token,
+      tiktok_access_token,
+      twitter_access_token,
+      twitter_access_secret,
+      youtube_refresh_token
+    } = body;
 
     let cleanUsername = username;
     if (cleanUsername && cleanUsername.startsWith('@')) {
       cleanUsername = cleanUsername.substring(1);
     }
 
-    if (!cleanUsername || !instagram_business_id || !access_token) {
+    if (!cleanUsername) {
       throw new BadRequestException({
-        error:
-          'username, instagram_business_id, and access_token are all required.',
+        error: 'username is required.',
         code: 'MISSING_FIELDS',
       });
     }
 
-    if (!access_token.trim()) {
-      throw new BadRequestException({
-        error: 'access_token cannot be blank or whitespace.',
-        code: 'INVALID_TOKEN',
-      });
+    const insertData: Record<string, any> = {
+      username: cleanUsername,
+      queue_status: 'active',
+      platforms_enabled,
+      instagram_business_id,
+      facebook_page_id
+    };
+
+    if (access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
+      insertData.access_token = `${iv}:${encryptedText}`;
+    }
+    if (tiktok_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(tiktok_access_token);
+      insertData.tiktok_access_token = `${iv}:${encryptedText}`;
+    }
+    if (twitter_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(twitter_access_token);
+      insertData.twitter_access_token = `${iv}:${encryptedText}`;
+    }
+    if (twitter_access_secret?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(twitter_access_secret);
+      insertData.twitter_access_secret = `${iv}:${encryptedText}`;
+    }
+    if (youtube_refresh_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(youtube_refresh_token);
+      insertData.youtube_refresh_token = `${iv}:${encryptedText}`;
     }
 
-    const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
     const supabase = this.supabaseService.getClient();
 
     const { data, error } = await supabase
       .from('accounts')
-      .insert({
-        username: cleanUsername,
-        instagram_business_id,
-        access_token: `${iv}:${encryptedText}`,
-        queue_status: 'active',
-      })
-      .select('id, username, instagram_business_id, created_at, queue_status')
+      .insert(insertData)
+      .select('id, username, instagram_business_id, facebook_page_id, platforms_enabled, created_at, queue_status')
       .single();
 
     if (error) {
@@ -183,21 +230,46 @@ export class AccountsController {
     @Param('id') id: string,
     @Body() body: UpdateAccountDto,
   ): Promise<AccountResponse> {
-    const { username, instagram_business_id, access_token } = body;
+    const { 
+      username, 
+      instagram_business_id, 
+      facebook_page_id,
+      access_token,
+      tiktok_access_token,
+      twitter_access_token,
+      twitter_access_secret,
+      youtube_refresh_token,
+      platforms_enabled
+    } = body;
 
     const updates: Record<string, any> = {};
+    
     if (username !== undefined) {
-      updates.username = username.startsWith('@')
-        ? username.substring(1)
-        : username;
+      updates.username = username.startsWith('@') ? username.substring(1) : username;
     }
-    if (instagram_business_id !== undefined)
-      updates.instagram_business_id = instagram_business_id;
+    if (instagram_business_id !== undefined) updates.instagram_business_id = instagram_business_id;
+    if (facebook_page_id !== undefined) updates.facebook_page_id = facebook_page_id;
+    if (platforms_enabled !== undefined) updates.platforms_enabled = platforms_enabled;
 
-    if (access_token) {
-      const { encryptedText, iv } =
-        this.encryptionService.encrypt(access_token);
+    if (access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(access_token);
       updates.access_token = `${iv}:${encryptedText}`;
+    }
+    if (tiktok_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(tiktok_access_token);
+      updates.tiktok_access_token = `${iv}:${encryptedText}`;
+    }
+    if (twitter_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(twitter_access_token);
+      updates.twitter_access_token = `${iv}:${encryptedText}`;
+    }
+    if (twitter_access_secret?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(twitter_access_secret);
+      updates.twitter_access_secret = `${iv}:${encryptedText}`;
+    }
+    if (youtube_refresh_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(youtube_refresh_token);
+      updates.youtube_refresh_token = `${iv}:${encryptedText}`;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -213,7 +285,7 @@ export class AccountsController {
       .from('accounts')
       .update(updates)
       .eq('id', id)
-      .select('id, username, instagram_business_id, created_at, queue_status')
+      .select('id, username, instagram_business_id, facebook_page_id, platforms_enabled, created_at, queue_status')
       .single();
 
     if (error) {
@@ -249,7 +321,7 @@ export class AccountsController {
       .from('accounts')
       .update({ queue_status: status })
       .eq('id', id)
-      .select('id, username, instagram_business_id, created_at, queue_status')
+      .select('id, username, instagram_business_id, facebook_page_id, platforms_enabled, created_at, queue_status')
       .single();
 
     if (error) {

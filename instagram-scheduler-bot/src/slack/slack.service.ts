@@ -84,9 +84,9 @@ export class SlackService {
     // --- Step 1: Parse @username from caption ---
     const rawCaption = rawText;
     this.logger.debug(`--> [SERVICE] Raw caption received: ${rawCaption}`);
-    const { username, caption } = this.parseCaption(rawCaption);
+    const { username, captions } = this.parseCaption(rawCaption);
     this.logger.debug(
-      `--> [SERVICE] Extracted Username: ${username} | Cleaned Caption: ${caption}`,
+      `--> [SERVICE] Extracted Username: ${username} | Cleaned Captions: ${captions.length}`,
     );
 
     if (!username) {
@@ -97,8 +97,8 @@ export class SlackService {
         event.channel,
         event.user,
         '❌ *Error:* Please specify a valid account username at the start of your caption.\n\n' +
-          'Format: `@username Your caption here`\n' +
-          'Example: `@football_edits Here is the new reel!`',
+        'Format: `@username Your caption here`\n' +
+        'For batch uploads with different captions: `@username Caption 1 $ Caption 2`',
       );
       return;
     }
@@ -136,14 +136,15 @@ export class SlackService {
       `🎯 Tenant routed: @${username} → account_id: ${account.id}`,
     );
 
-    // --- Step 3: Process each file ---
+    // --- Step 3: Process each file sequentially ---
+    let fileIndex = 0;
     for (const file of event.files!) {
       const fileId = file.id;
       const downloadUrl = file.url_private_download;
       const originalName = file.name || 'video.mp4';
       const mimetype = file.mimetype || '';
       const extension = originalName.split('.').pop()?.toLowerCase() || 'mp4';
-      
+
       const isVideoMimeType = mimetype.startsWith('video/');
       const isVideoExtension = ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(extension);
 
@@ -154,9 +155,19 @@ export class SlackService {
           event.channel,
           event.user,
           `❌ *Error:* Only video files are accepted.\n` +
-            `You uploaded: \`${originalName}\` (${mimetype || 'unknown type'})`,
+          `You uploaded: \`${originalName}\` (${mimetype || 'unknown type'})`,
         );
+        fileIndex++;
         continue;
+      }
+
+      // Determine the caption for this file based on its index
+      let currentCaption = '';
+      if (captions.length > 0) {
+        currentCaption =
+          fileIndex < captions.length
+            ? captions[fileIndex]
+            : captions[captions.length - 1];
       }
 
       // Generate a unique filename to avoid collisions in R2
@@ -204,7 +215,7 @@ export class SlackService {
           queueRecord = await this.schedulerService.addToQueue(
             account.id,
             publicUrl,
-            caption,
+            currentCaption,
             fileId,
           );
         } catch (dbError) {
@@ -228,7 +239,7 @@ export class SlackService {
           text:
             `✅ *Video queued for @${username}!*\n\n` +
             `📅 Scheduled: ${displayDate}\n` +
-            `📝 Caption: ${caption || '(none)'}\n` +
+            `📝 Caption: ${currentCaption || '(none)'}\n` +
             `🎬 File: \`${uniqueFileName}\``,
         });
 
@@ -266,7 +277,7 @@ export class SlackService {
           } catch (r2CleanupError) {
             this.logger.warn(
               `Failed to clean up orphan R2 file "${uniqueFileName}". ` +
-                `Manual cleanup may be needed.`,
+              `Manual cleanup may be needed.`,
             );
           }
         }
@@ -275,9 +286,11 @@ export class SlackService {
           event.channel,
           event.user,
           `❌ *Error processing file:* \`${originalName}\`\n\n` +
-            `\`${error instanceof Error ? error.message : String(error)}\``,
+          `\`${error instanceof Error ? error.message : String(error)}\``,
         );
       }
+
+      fileIndex++;
     }
   }
 
@@ -384,7 +397,7 @@ export class SlackService {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: '*Upload a Video*\nUpload a video file with the caption and `@accountname` in the message.',
+          text: '*Upload a Video*\nUpload a video file or batch of files with the caption and `@accountname` in the message. For batches, separate multiple captions using `$`.',
         },
       },
       {
@@ -555,26 +568,38 @@ export class SlackService {
 
   /**
    * Parses the @username from the beginning of a caption.
-   *
-   * Input:  "@football_edits Here is the new reel!"
-   * Output: { username: "football_edits", caption: "Here is the new reel!" }
-   *
-   * Input:  "No username here"
-   * Output: { username: null, caption: "No username here" }
+   * Extracts an array of captions separated by $ if present.
    */
   private parseCaption(text: string): {
     username: string | null;
-    caption: string;
+    captions: string[];
   } {
     const match = text.match(/^@(\S+)\s*([\s\S]*)$/);
 
     if (!match) {
-      return { username: null, caption: text };
+      return { username: null, captions: [] };
+    }
+
+    const username = match[1];
+    const remainingText = match[2]?.trim() || '';
+
+    if (!remainingText) {
+      return { username, captions: [] };
+    }
+
+    let captions: string[] = [];
+    if (remainingText.includes('$')) {
+      captions = remainingText
+        .split('$')
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+    } else {
+      captions = [remainingText];
     }
 
     return {
-      username: match[1],
-      caption: match[2]?.trim() || '',
+      username,
+      captions,
     };
   }
 

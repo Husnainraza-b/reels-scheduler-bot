@@ -9,8 +9,9 @@ import {
   Pencil,
   Trash2,
   Film,
-  FileText,
+  FileText
 } from 'lucide-react';
+import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6';
 import type { QueueItem, Account } from '../services/api';
 import { updateQueueCaption, deleteQueueItem } from '../services/api';
 
@@ -293,9 +294,23 @@ export default function QueueStream({
                       <p className="text-sm font-medium text-text-primary font-mono truncate">
                         {item.video_url.split('/').pop()}
                       </p>
-                      <p className="text-xs text-text-secondary mt-0.5">
-                        {getAccountUsername(item.account_id, accounts)} · {formatPKTFull(item.scheduled_for)}
-                      </p>
+                      <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-2">
+                        <span>{getAccountUsername(item.account_id, accounts)}</span>
+                        <span>·</span>
+                        <span>{formatPKTFull(item.scheduled_for)}</span>
+                        {account?.platforms_enabled && (
+                          <>
+                            <span>·</span>
+                            <div className="flex items-center gap-1.5 text-text-muted/80">
+                              {account.platforms_enabled.instagram && <FaInstagram className="w-3.5 h-3.5" />}
+                              {account.platforms_enabled.facebook && <FaFacebook className="w-3.5 h-3.5" />}
+                              {account.platforms_enabled.tiktok && <FaTiktok className="w-3.5 h-3.5" />}
+                              {account.platforms_enabled.x && <FaXTwitter className="w-3.5 h-3.5" />}
+                              {account.platforms_enabled.youtube && <FaYoutube className="w-3.5 h-3.5" />}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <a
                       href={item.video_url}

@@ -6,9 +6,22 @@ import { CryptoModule } from '../crypto/crypto.module';
 import { StorageModule } from '../storage/storage.module';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 
+import { InstagramPublisher } from './platforms/instagram.publisher';
+import { FacebookPublisher } from './platforms/facebook.publisher';
+import { TiktokPublisher } from './platforms/tiktok.publisher';
+import { TwitterPublisher } from './platforms/x.publisher';
+import { YoutubePublisher } from './platforms/youtube.publisher';
+
 @Module({
   imports: [DatabaseModule, CryptoModule, StorageModule, SchedulerModule],
   controllers: [PublisherController],
-  providers: [CronPublisherService],
+  providers: [
+    CronPublisherService,
+    InstagramPublisher,
+    FacebookPublisher,
+    TiktokPublisher,
+    TwitterPublisher,
+    YoutubePublisher
+  ],
 })
 export class PublisherModule {}

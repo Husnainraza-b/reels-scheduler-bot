@@ -74,18 +74,6 @@ export class SlackController {
         `--> [CONTROLLER] Event callback triggered. Type: ${event.type}`,
       );
 
-      // Handle 'file_shared' event (e.g. forwarded files)
-      if (event.type === 'file_shared') {
-        const fileId = event.file_id || event.file?.id;
-
-        // Safeguard to gracefully ignore empty events instead of crashing
-        if (!fileId) return;
-
-        // Note: Further processing for file_shared would go here if needed.
-        // For now, returning to acknowledge receipt without crashing.
-        return;
-      }
-
       this.logger.debug(
         `--> [CONTROLLER] Files attached: ${event.files ? event.files.length : 0}`,
       );

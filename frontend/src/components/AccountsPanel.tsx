@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import {
   UserPlus,
-  Camera,
   KeyRound,
   AtSign,
   Loader2,
@@ -13,7 +12,8 @@ import {
   Pause,
   Play
 } from 'lucide-react';
-import type { Account, PostingSlot } from '../services/api';
+import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6';
+import type { Account, PostingSlot, PlatformsEnabled } from '../services/api';
 import { createAccount, deleteAccount, updateAccount, toggleQueueStatus } from '../services/api';
 import SlotsConfigurator from './SlotsConfigurator';
 
@@ -37,19 +37,47 @@ export default function AccountsPanel({
   onSlotsChanged
 }: AccountsPanelProps) {
   const [showForm, setShowForm] = useState(false);
+  // Add Form State
   const [username, setUsername] = useState('');
+  const [platforms, setPlatforms] = useState<PlatformsEnabled>({
+    instagram: true,
+    facebook: false,
+    tiktok: false,
+    x: false,
+    youtube: false,
+  });
   const [businessId, setBusinessId] = useState('');
+  const [facebookPageId, setFacebookPageId] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [tiktokAccessToken, setTiktokAccessToken] = useState('');
+  const [twitterAccessToken, setTwitterAccessToken] = useState('');
+  const [twitterAccessSecret, setTwitterAccessSecret] = useState('');
+  const [youtubeRefreshToken, setYoutubeRefreshToken] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [accountToDelete, setAccountToDelete] = useState<number | null>(null);
 
+  // Edit Form State
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const [editUsername, setEditUsername] = useState('');
+  const [editPlatforms, setEditPlatforms] = useState<PlatformsEnabled>({
+    instagram: true,
+    facebook: false,
+    tiktok: false,
+    x: false,
+    youtube: false,
+  });
   const [editBusinessId, setEditBusinessId] = useState('');
+  const [editFacebookPageId, setEditFacebookPageId] = useState('');
   const [editAccessToken, setEditAccessToken] = useState('');
+  const [editTiktokAccessToken, setEditTiktokAccessToken] = useState('');
+  const [editTwitterAccessToken, setEditTwitterAccessToken] = useState('');
+  const [editTwitterAccessSecret, setEditTwitterAccessSecret] = useState('');
+  const [editYoutubeRefreshToken, setEditYoutubeRefreshToken] = useState('');
+
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [togglingQueueId, setTogglingQueueId] = useState<number | null>(null);
 
@@ -57,17 +85,42 @@ export default function AccountsPanel({
     e.stopPropagation();
     setEditingAccountId(account.id);
     setEditUsername(account.username);
-    setEditBusinessId(account.instagram_business_id);
+    setEditPlatforms(
+      account.platforms_enabled || {
+        instagram: true,
+        facebook: false,
+        tiktok: false,
+        x: false,
+        youtube: false,
+      }
+    );
+    setEditBusinessId(account.instagram_business_id || '');
+    setEditFacebookPageId(account.facebook_page_id || '');
     setEditAccessToken('');
+    setEditTiktokAccessToken('');
+    setEditTwitterAccessToken('');
+    setEditTwitterAccessSecret('');
+    setEditYoutubeRefreshToken('');
   };
 
   const handleSaveAccountEdit = async (id: number) => {
-    if (!editUsername || !editBusinessId) return;
+    if (!editUsername) return;
     setIsSavingEdit(true);
     setErrorMsg('');
     try {
-      const payload: any = { username: editUsername, instagram_business_id: editBusinessId };
+      const payload: any = {
+        username: editUsername,
+        platforms_enabled: editPlatforms,
+      };
+      
+      if (editPlatforms.instagram) payload.instagram_business_id = editBusinessId;
+      if (editPlatforms.facebook) payload.facebook_page_id = editFacebookPageId;
       if (editAccessToken) payload.access_token = editAccessToken;
+      if (editTiktokAccessToken) payload.tiktok_access_token = editTiktokAccessToken;
+      if (editTwitterAccessToken) payload.twitter_access_token = editTwitterAccessToken;
+      if (editTwitterAccessSecret) payload.twitter_access_secret = editTwitterAccessSecret;
+      if (editYoutubeRefreshToken) payload.youtube_refresh_token = editYoutubeRefreshToken;
+
       await updateAccount(id, payload);
       setEditingAccountId(null);
       setSuccessMsg('Account updated successfully!');
@@ -115,19 +168,30 @@ export default function AccountsPanel({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !businessId || !accessToken) return;
+    if (!username) return;
 
     setIsSubmitting(true);
     setErrorMsg('');
     try {
       await createAccount({
         username,
-        instagram_business_id: businessId,
-        access_token: accessToken,
+        platforms_enabled: platforms,
+        instagram_business_id: platforms.instagram ? businessId : undefined,
+        facebook_page_id: platforms.facebook ? facebookPageId : undefined,
+        access_token: accessToken || undefined,
+        tiktok_access_token: tiktokAccessToken || undefined,
+        twitter_access_token: twitterAccessToken || undefined,
+        twitter_access_secret: twitterAccessSecret || undefined,
+        youtube_refresh_token: youtubeRefreshToken || undefined,
       });
       setUsername('');
       setBusinessId('');
+      setFacebookPageId('');
       setAccessToken('');
+      setTiktokAccessToken('');
+      setTwitterAccessToken('');
+      setTwitterAccessSecret('');
+      setYoutubeRefreshToken('');
       setShowForm(false);
       setSuccessMsg('Account added successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -178,6 +242,33 @@ export default function AccountsPanel({
       {/* Inline Add Form */}
       {showForm && (
         <form onSubmit={handleSubmit} className="w-full p-5 border border-outline/20 bg-surface-lowest rounded-sm flex flex-col gap-4">
+          
+          <div className="flex flex-col gap-3 mb-2">
+            <label className="text-xs font-semibold uppercase text-text-secondary tracking-widest">Platforms</label>
+            <div className="flex flex-wrap gap-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.instagram} onChange={(e) => setPlatforms({ ...platforms, instagram: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaInstagram className="w-4 h-4" /> Instagram</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.facebook} onChange={(e) => setPlatforms({ ...platforms, facebook: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaFacebook className="w-4 h-4" /> Facebook</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.tiktok} onChange={(e) => setPlatforms({ ...platforms, tiktok: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaTiktok className="w-4 h-4" /> TikTok</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.x} onChange={(e) => setPlatforms({ ...platforms, x: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaXTwitter className="w-4 h-4" /> X (Twitter)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.youtube} onChange={(e) => setPlatforms({ ...platforms, youtube: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaYoutube className="w-4 h-4" /> YouTube</span>
+              </label>
+            </div>
+          </div>
+
           <div className="input-underline">
             <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
               <AtSign className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
@@ -187,33 +278,80 @@ export default function AccountsPanel({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
+                required
               />
             </div>
           </div>
-          <div className="input-underline">
-            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
-              <Camera className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Meta Business ID"
-                value={businessId}
-                onChange={(e) => setBusinessId(e.target.value)}
-                className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
-              />
+
+          {(platforms.instagram || platforms.facebook) && (
+            <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase">Meta Credentials</span>
+              {platforms.instagram && (
+                <div className="input-underline">
+                  <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                    <FaInstagram className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                    <input type="text" placeholder="Instagram Business ID" value={businessId} onChange={(e) => setBusinessId(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                  </div>
+                </div>
+              )}
+              {platforms.facebook && (
+                <div className="input-underline">
+                  <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                    <FaFacebook className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                    <input type="text" placeholder="Facebook Page ID" value={facebookPageId} onChange={(e) => setFacebookPageId(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                  </div>
+                </div>
+              )}
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="Meta Graph Access Token" value={accessToken} onChange={(e) => setAccessToken(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="input-underline">
-            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
-              <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
-              <input
-                type="password"
-                placeholder="Access Token (encrypted)"
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0"
-              />
+          )}
+
+          {platforms.tiktok && (
+            <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase">TikTok Credentials</span>
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="TikTok Access Token" value={tiktokAccessToken} onChange={(e) => setTiktokAccessToken(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {platforms.x && (
+            <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase">X (Twitter) Credentials</span>
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="Twitter Access Token" value={twitterAccessToken} onChange={(e) => setTwitterAccessToken(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="Twitter Access Secret" value={twitterAccessSecret} onChange={(e) => setTwitterAccessSecret(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {platforms.youtube && (
+            <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase">YouTube Credentials</span>
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="YouTube Refresh Token" value={youtubeRefreshToken} onChange={(e) => setYoutubeRefreshToken(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2 mt-2">
             <button
               type="button"
@@ -249,6 +387,33 @@ export default function AccountsPanel({
                 {editingAccountId === account.id ? (
                   /* ─── Edit Form ─── */
                   <div className="p-5 bg-surface-lowest border border-outline/20 rounded-sm flex flex-col gap-4">
+                    
+                    <div className="flex flex-col gap-3 mb-2">
+                      <label className="text-xs font-semibold uppercase text-text-secondary tracking-widest">Platforms Enabled</label>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.instagram} onChange={(e) => setEditPlatforms({ ...editPlatforms, instagram: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaInstagram className="w-4 h-4" /> Instagram</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.facebook} onChange={(e) => setEditPlatforms({ ...editPlatforms, facebook: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaFacebook className="w-4 h-4" /> Facebook</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.tiktok} onChange={(e) => setEditPlatforms({ ...editPlatforms, tiktok: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaTiktok className="w-4 h-4" /> TikTok</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.x} onChange={(e) => setEditPlatforms({ ...editPlatforms, x: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaXTwitter className="w-4 h-4" /> X</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.youtube} onChange={(e) => setEditPlatforms({ ...editPlatforms, youtube: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaYoutube className="w-4 h-4" /> YouTube</span>
+                        </label>
+                      </div>
+                    </div>
+
                     <div className="input-underline">
                       <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
                         <AtSign className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
@@ -258,33 +423,80 @@ export default function AccountsPanel({
                           value={editUsername}
                           onChange={(e) => setEditUsername(e.target.value)}
                           className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
+                          required
                         />
                       </div>
                     </div>
-                    <div className="input-underline">
-                      <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
-                        <Camera className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
-                        <input
-                          type="text"
-                          placeholder="Meta Business ID"
-                          value={editBusinessId}
-                          onChange={(e) => setEditBusinessId(e.target.value)}
-                          className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
-                        />
+
+                    {(editPlatforms.instagram || editPlatforms.facebook) && (
+                      <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+                        <span className="text-xs font-semibold text-text-secondary uppercase">Meta Credentials</span>
+                        {editPlatforms.instagram && (
+                          <div className="input-underline">
+                            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                              <FaInstagram className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                              <input type="text" placeholder="Instagram Business ID" value={editBusinessId} onChange={(e) => setEditBusinessId(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" required />
+                            </div>
+                          </div>
+                        )}
+                        {editPlatforms.facebook && (
+                          <div className="input-underline">
+                            <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                              <FaFacebook className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                              <input type="text" placeholder="Facebook Page ID" value={editFacebookPageId} onChange={(e) => setEditFacebookPageId(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" required />
+                            </div>
+                          </div>
+                        )}
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New Meta Graph Access Token (leave blank to keep)" value={editAccessToken} onChange={(e) => setEditAccessToken(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="input-underline">
-                      <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
-                        <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
-                        <input
-                          type="password"
-                          placeholder="New Token (leave blank to keep)"
-                          value={editAccessToken}
-                          onChange={(e) => setEditAccessToken(e.target.value)}
-                          className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0"
-                        />
+                    )}
+
+                    {editPlatforms.tiktok && (
+                      <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+                        <span className="text-xs font-semibold text-text-secondary uppercase">TikTok Credentials</span>
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New TikTok Access Token (leave blank to keep)" value={editTiktokAccessToken} onChange={(e) => setEditTiktokAccessToken(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {editPlatforms.x && (
+                      <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+                        <span className="text-xs font-semibold text-text-secondary uppercase">X (Twitter) Credentials</span>
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New Twitter Access Token (leave blank to keep)" value={editTwitterAccessToken} onChange={(e) => setEditTwitterAccessToken(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New Twitter Access Secret (leave blank to keep)" value={editTwitterAccessSecret} onChange={(e) => setEditTwitterAccessSecret(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {editPlatforms.youtube && (
+                      <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+                        <span className="text-xs font-semibold text-text-secondary uppercase">YouTube Credentials</span>
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New YouTube Refresh Token (leave blank to keep)" value={editYoutubeRefreshToken} onChange={(e) => setEditYoutubeRefreshToken(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex justify-end gap-2 mt-2">
                       <button
                         type="button"
@@ -322,9 +534,23 @@ export default function AccountsPanel({
                             {account.queue_status || 'ACTIVE'}
                           </span>
                         </div>
-                        <p className="text-xs text-text-secondary mt-1">
-                          ID: {account.instagram_business_id}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs text-text-secondary">
+                            ID: {account.instagram_business_id || 'N/A'}
+                          </p>
+                          {account.platforms_enabled && (
+                            <>
+                              <span className="text-text-secondary/50">·</span>
+                              <div className="flex items-center gap-1.5 text-text-secondary/80">
+                                {account.platforms_enabled.instagram && <FaInstagram className="w-3.5 h-3.5" />}
+                                {account.platforms_enabled.facebook && <FaFacebook className="w-3.5 h-3.5" />}
+                                {account.platforms_enabled.tiktok && <FaTiktok className="w-3.5 h-3.5" />}
+                                {account.platforms_enabled.x && <FaXTwitter className="w-3.5 h-3.5" />}
+                                {account.platforms_enabled.youtube && <FaYoutube className="w-3.5 h-3.5" />}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Hover Actions */}
