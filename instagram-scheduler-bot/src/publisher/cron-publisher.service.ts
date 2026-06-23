@@ -103,7 +103,7 @@ export class CronPublisherService {
     const { data: dueItems, error: queryError } = await supabase
       .from('queue')
       .select(`
-        id, account_id, video_url, caption, scheduled_for, status, retry_count,
+        id, account_id, video_url, caption, scheduled_for, status, retry_count, published_platforms,
         accounts (
           username, platforms_enabled, instagram_business_id, facebook_page_id,
           access_token, tiktok_access_token, twitter_access_token, twitter_access_secret, youtube_refresh_token,
@@ -128,6 +128,7 @@ export class CronPublisherService {
         scheduled_for: raw.scheduled_for,
         status: raw.status,
         retry_count: raw.retry_count ?? 0,
+        published_platforms: raw.published_platforms || [],
         username: account.username,
         platforms_enabled: account.platforms_enabled || { instagram: true },
         instagram_business_id: account.instagram_business_id,
@@ -169,54 +170,83 @@ export class CronPublisherService {
     if (lockError) return;
 
     try {
-      // Execute all enabled platform publishers concurrently
-      const tasks: Promise<void>[] = [];
+      // Set of already published platforms
+      const published = new Set(item.published_platforms);
+      const tasks: Promise<{ platform: string; status: 'fulfilled' | 'rejected'; reason?: any }>[] = [];
       const attemptedPlatforms: string[] = [];
 
-      if (item.platforms_enabled.instagram) {
-        tasks.push(this.instagramPublisher.publish(item));
+      if (item.platforms_enabled.instagram && !published.has('instagram')) {
+        tasks.push(this.instagramPublisher.publish(item).then(() => ({ platform: 'instagram', status: 'fulfilled' as const })).catch((err) => ({ platform: 'instagram', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('Instagram');
       }
-      if (item.platforms_enabled.facebook) {
-        tasks.push(this.facebookPublisher.publish(item));
+      if (item.platforms_enabled.facebook && !published.has('facebook')) {
+        tasks.push(this.facebookPublisher.publish(item).then(() => ({ platform: 'facebook', status: 'fulfilled' as const })).catch((err) => ({ platform: 'facebook', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('Facebook');
       }
-      if (item.platforms_enabled.tiktok) {
-        tasks.push(this.tiktokPublisher.publish(item));
+      if (item.platforms_enabled.tiktok && !published.has('tiktok')) {
+        tasks.push(this.tiktokPublisher.publish(item).then(() => ({ platform: 'tiktok', status: 'fulfilled' as const })).catch((err) => ({ platform: 'tiktok', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('TikTok');
       }
-      if (item.platforms_enabled.x) {
-        tasks.push(this.twitterPublisher.publish(item));
+      if (item.platforms_enabled.x && !published.has('x')) {
+        tasks.push(this.twitterPublisher.publish(item).then(() => ({ platform: 'x', status: 'fulfilled' as const })).catch((err) => ({ platform: 'x', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('X');
       }
-      if (item.platforms_enabled.youtube) {
-        tasks.push(this.youtubePublisher.publish(item));
+      if (item.platforms_enabled.youtube && !published.has('youtube')) {
+        tasks.push(this.youtubePublisher.publish(item).then(() => ({ platform: 'youtube', status: 'fulfilled' as const })).catch((err) => ({ platform: 'youtube', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('YouTube');
       }
 
-      // Wait for all to finish
-      const results = await Promise.allSettled(tasks);
+      // If there's nothing to attempt, this means either no platforms enabled, or all are already published.
+      // But if it was stuck in pending/processing, we should just consider it fully published.
+      if (tasks.length === 0) {
+        attemptedPlatforms.push('None (already published to all enabled)');
+      }
 
-      const failures = results.filter((r) => r.status === 'rejected') as PromiseRejectedResult[];
+      // Wait for all newly attempted platforms to finish
+      const results = await Promise.all(tasks);
+
+      const newPublished = new Set(published);
+      const failures: any[] = [];
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          newPublished.add(result.platform);
+        } else {
+          failures.push(result.reason);
+        }
+      }
+
+      const allEnabledPlatforms = ['instagram', 'facebook', 'tiktok', 'x', 'youtube'].filter((p) => (item.platforms_enabled as any)[p]);
+      const allPublished = allEnabledPlatforms.every((p) => newPublished.has(p));
 
       if (failures.length > 0) {
-        const errorMessages = failures.map((f) => (f.reason instanceof Error ? f.reason.message : String(f.reason)));
+        // If there are failures, save the newly successful platforms to DB, then throw error to trigger retry
+        await supabase
+          .from('queue')
+          .update({ published_platforms: Array.from(newPublished) })
+          .eq('id', item.id);
+
+        const errorMessages = failures.map((f) => (f instanceof Error ? f.message : String(f)));
         throw new Error(`Platforms failed: ${errorMessages.join(' | ')}`);
       }
 
-      // Delete from R2 only if ALL succeed
-      const fileName = this.extractFileNameFromUrl(item.video_url);
-      if (fileName) {
-        try {
-          await this.cloudflareR2Service.deleteVideo(fileName);
-        } catch (r2Error) {}
+      // If we reach here, ALL newly attempted platforms succeeded!
+      // Delete from R2 only if ALL enabled platforms are now successfully published
+      if (allPublished) {
+        const fileName = this.extractFileNameFromUrl(item.video_url);
+        if (fileName) {
+          try {
+            await this.cloudflareR2Service.deleteVideo(fileName);
+          } catch (r2Error) {}
+        }
       }
 
       await supabase
         .from('queue')
         .update({
-          status: 'published',
-          published_at: new Date().toISOString(),
+          status: allPublished ? 'published' : 'pending', // Failsafe, should always be allPublished here
+          published_platforms: Array.from(newPublished),
+          published_at: allPublished ? new Date().toISOString() : null,
         })
         .eq('id', item.id);
 

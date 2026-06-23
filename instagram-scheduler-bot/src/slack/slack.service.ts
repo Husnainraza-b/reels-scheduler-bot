@@ -613,11 +613,11 @@ export class SlackService {
     // Strip leading @ so lookup works regardless of how accounts were stored
     const clean = username.startsWith('@') ? username.slice(1) : username;
 
-    // Safe parameterised query — no string concatenation into filter
+    // Safe parameterised query — using ilike for case insensitivity
     let { data } = await supabase
       .from('accounts')
       .select('id, username')
-      .eq('username', clean)
+      .ilike('username', clean)
       .maybeSingle();
 
     // Fallback: try with @ prefix for any older records
@@ -625,7 +625,7 @@ export class SlackService {
       const fallback = await supabase
         .from('accounts')
         .select('id, username')
-        .eq('username', `@${clean}`)
+        .ilike('username', `@${clean}`)
         .maybeSingle();
       data = fallback.data;
     }

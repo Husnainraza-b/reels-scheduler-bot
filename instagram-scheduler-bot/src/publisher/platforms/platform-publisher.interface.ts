@@ -9,12 +9,13 @@ export interface PublishableItem {
   // Joined from accounts table
   username: string;
   platforms_enabled: {
-    instagram: boolean;
-    facebook: boolean;
-    tiktok: boolean;
-    x: boolean;
-    youtube: boolean;
+    instagram?: boolean;
+    facebook?: boolean;
+    tiktok?: boolean;
+    x?: boolean;
+    youtube?: boolean;
   };
+  published_platforms: string[]; // List of platform names this item has successfully posted to
   instagram_business_id?: string;
   facebook_page_id?: string;
   access_token?: string; // meta
