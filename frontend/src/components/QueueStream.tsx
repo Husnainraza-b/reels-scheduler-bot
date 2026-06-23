@@ -302,11 +302,11 @@ export default function QueueStream({
                           <>
                             <span>·</span>
                             <div className="flex items-center gap-1.5 text-text-muted/80">
-                              {account.platforms_enabled.instagram && <FaInstagram className="w-3.5 h-3.5" />}
-                              {account.platforms_enabled.facebook && <FaFacebook className="w-3.5 h-3.5" />}
-                              {account.platforms_enabled.tiktok && <FaTiktok className="w-3.5 h-3.5" />}
-                              {account.platforms_enabled.x && <FaXTwitter className="w-3.5 h-3.5" />}
-                              {account.platforms_enabled.youtube && <FaYoutube className="w-3.5 h-3.5" />}
+                              {account.platforms_enabled.instagram && !item.published_platforms?.includes('instagram') && <FaInstagram className="w-3.5 h-3.5" title="Instagram (Pending)" />}
+                              {account.platforms_enabled.facebook && !item.published_platforms?.includes('facebook') && <FaFacebook className="w-3.5 h-3.5" title="Facebook (Pending)" />}
+                              {account.platforms_enabled.tiktok && !item.published_platforms?.includes('tiktok') && <FaTiktok className="w-3.5 h-3.5" title="TikTok (Pending)" />}
+                              {account.platforms_enabled.x && !item.published_platforms?.includes('x') && <FaXTwitter className="w-3.5 h-3.5" title="X/Twitter (Pending)" />}
+                              {account.platforms_enabled.youtube && !item.published_platforms?.includes('youtube') && <FaYoutube className="w-3.5 h-3.5" title="YouTube (Pending)" />}
                             </div>
                           </>
                         )}

@@ -76,6 +76,7 @@ export interface QueueItem {
   caption: string | null;
   scheduled_for: string;
   status: string;
+  published_platforms?: string[];
   slack_file_id: string | null;
   created_at: string;
 }
