@@ -32,8 +32,8 @@ This document serves as the absolute single source of truth for the entire Socia
   2. Slack fires an Event Webhook to our NestJS backend.
   3. The backend's `SlackSignatureGuard` securely intercepts the request and verifies the cryptographic signature to ensure it legitimately came from Slack.
   4. **Case-Insensitive Account Routing:** The backend parses the username and uses a case-insensitive lookup (via `ilike`) against the database. This guarantees that typos like `@myaccount` match `MyAccount`.
-  5. The backend downloads the video directly from Slack's servers into memory.
-  6. The backend immediately uploads the video to **Cloudflare R2 Storage** to get a permanent public URL.
+  5. The backend initiates a **Pass-Through Stream**, downloading the video from Slack's servers and piping it directly to **Cloudflare R2 Storage** in real-time. It does not buffer the video into memory, preventing OOM crashes during large batches.
+  6. It retrieves the permanent public URL from R2.
   7. It calls the **Atomic Gap Finder** to calculate the exact timestamp this video should be posted based on the account's posting slots.
   8. Finally, it inserts a new row into the `queue` database table.
 
