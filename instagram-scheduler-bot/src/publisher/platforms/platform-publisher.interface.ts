@@ -14,6 +14,7 @@ export interface PublishableItem {
     tiktok?: boolean;
     x?: boolean;
     youtube?: boolean;
+    snapchat?: boolean;
   };
   published_platforms: string[]; // List of platform names this item has successfully posted to
   instagram_business_id?: string;
@@ -23,6 +24,7 @@ export interface PublishableItem {
   twitter_access_token?: string;
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
+  snapchat_access_token?: string;
   platform_metadata?: Record<string, { media_id?: string; status?: string }>;
 }
 

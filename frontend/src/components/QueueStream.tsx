@@ -11,7 +11,7 @@ import {
   Film,
   FileText
 } from 'lucide-react';
-import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube, FaSnapchat } from 'react-icons/fa6';
 import type { QueueItem, Account } from '../services/api';
 import { updateQueueCaption, deleteQueueItem } from '../services/api';
 
@@ -328,6 +328,7 @@ export default function QueueStream({
                               {account.platforms_enabled.tiktok && !item.published_platforms?.includes('tiktok') && <FaTiktok className="w-3.5 h-3.5" title="TikTok (Pending)" />}
                               {account.platforms_enabled.x && !item.published_platforms?.includes('x') && <FaXTwitter className="w-3.5 h-3.5" title="X/Twitter (Pending)" />}
                               {account.platforms_enabled.youtube && !item.published_platforms?.includes('youtube') && <FaYoutube className="w-3.5 h-3.5" title="YouTube (Pending)" />}
+                              {account.platforms_enabled.snapchat && !item.published_platforms?.includes('snapchat') && <FaSnapchat className="w-3.5 h-3.5" title="Snapchat (Pending)" />}
                             </div>
                           </>
                         )}

@@ -47,6 +47,7 @@ export interface PlatformsEnabled {
   tiktok: boolean;
   x: boolean;
   youtube: boolean;
+  snapchat: boolean;
 }
 
 export interface Account {
@@ -58,6 +59,7 @@ export interface Account {
   twitter_access_token?: string | null;
   twitter_access_secret?: string | null;
   youtube_refresh_token?: string | null;
+  snapchat_access_token?: string | null;
   platforms_enabled: PlatformsEnabled;
   created_at: string;
   queue_status: string;
@@ -118,6 +120,7 @@ export async function createAccount(payload: {
   twitter_access_token?: string;
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
+  snapchat_access_token?: string;
   platforms_enabled: PlatformsEnabled;
 }): Promise<Account> {
   const { data } = await api.post<Account>('/dashboard/accounts', payload);
@@ -135,6 +138,7 @@ export async function updateAccount(
     twitter_access_token: string;
     twitter_access_secret: string;
     youtube_refresh_token: string;
+    snapchat_access_token: string;
     platforms_enabled: PlatformsEnabled;
   }>
 ): Promise<Account> {

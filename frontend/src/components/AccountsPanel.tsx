@@ -12,7 +12,7 @@ import {
   Pause,
   Play
 } from 'lucide-react';
-import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6';
+import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube, FaSnapchat } from 'react-icons/fa6';
 import type { Account, PostingSlot, PlatformsEnabled } from '../services/api';
 import { createAccount, deleteAccount, updateAccount, toggleQueueStatus } from '../services/api';
 import SlotsConfigurator from './SlotsConfigurator';
@@ -45,6 +45,7 @@ export default function AccountsPanel({
     tiktok: false,
     x: false,
     youtube: false,
+    snapchat: false,
   });
   const [businessId, setBusinessId] = useState('');
   const [facebookPageId, setFacebookPageId] = useState('');
@@ -53,6 +54,7 @@ export default function AccountsPanel({
   const [twitterAccessToken, setTwitterAccessToken] = useState('');
   const [twitterAccessSecret, setTwitterAccessSecret] = useState('');
   const [youtubeRefreshToken, setYoutubeRefreshToken] = useState('');
+  const [snapchatAccessToken, setSnapchatAccessToken] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -69,6 +71,7 @@ export default function AccountsPanel({
     tiktok: false,
     x: false,
     youtube: false,
+    snapchat: false,
   });
   const [editBusinessId, setEditBusinessId] = useState('');
   const [editFacebookPageId, setEditFacebookPageId] = useState('');
@@ -77,6 +80,7 @@ export default function AccountsPanel({
   const [editTwitterAccessToken, setEditTwitterAccessToken] = useState('');
   const [editTwitterAccessSecret, setEditTwitterAccessSecret] = useState('');
   const [editYoutubeRefreshToken, setEditYoutubeRefreshToken] = useState('');
+  const [editSnapchatAccessToken, setEditSnapchatAccessToken] = useState('');
 
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [togglingQueueId, setTogglingQueueId] = useState<number | null>(null);
@@ -92,6 +96,7 @@ export default function AccountsPanel({
         tiktok: false,
         x: false,
         youtube: false,
+        snapchat: false,
       }
     );
     setEditBusinessId(account.instagram_business_id || '');
@@ -101,6 +106,7 @@ export default function AccountsPanel({
     setEditTwitterAccessToken('');
     setEditTwitterAccessSecret('');
     setEditYoutubeRefreshToken('');
+    setEditSnapchatAccessToken('');
   };
 
   const handleSaveAccountEdit = async (id: number) => {
@@ -120,6 +126,7 @@ export default function AccountsPanel({
       if (editTwitterAccessToken) payload.twitter_access_token = editTwitterAccessToken;
       if (editTwitterAccessSecret) payload.twitter_access_secret = editTwitterAccessSecret;
       if (editYoutubeRefreshToken) payload.youtube_refresh_token = editYoutubeRefreshToken;
+      if (editSnapchatAccessToken) payload.snapchat_access_token = editSnapchatAccessToken;
 
       await updateAccount(id, payload);
       setEditingAccountId(null);
@@ -183,6 +190,7 @@ export default function AccountsPanel({
         twitter_access_token: twitterAccessToken || undefined,
         twitter_access_secret: twitterAccessSecret || undefined,
         youtube_refresh_token: youtubeRefreshToken || undefined,
+        snapchat_access_token: snapchatAccessToken || undefined,
       });
       setUsername('');
       setBusinessId('');
@@ -192,6 +200,7 @@ export default function AccountsPanel({
       setTwitterAccessToken('');
       setTwitterAccessSecret('');
       setYoutubeRefreshToken('');
+      setSnapchatAccessToken('');
       setShowForm(false);
       setSuccessMsg('Account added successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
@@ -265,6 +274,10 @@ export default function AccountsPanel({
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={platforms.youtube} onChange={(e) => setPlatforms({ ...platforms, youtube: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
                 <span className="text-sm text-text-primary flex items-center gap-1.5"><FaYoutube className="w-4 h-4" /> YouTube</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={platforms.snapchat} onChange={(e) => setPlatforms({ ...platforms, snapchat: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                <span className="text-sm text-text-primary flex items-center gap-1.5"><FaSnapchat className="w-4 h-4" /> Snapchat</span>
               </label>
             </div>
           </div>
@@ -352,6 +365,17 @@ export default function AccountsPanel({
               </div>
             </div>
           )}
+          {platforms.snapchat && (
+            <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+              <span className="text-xs font-semibold text-text-secondary uppercase">Snapchat Credentials</span>
+              <div className="input-underline">
+                <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                  <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                  <input type="password" placeholder="Snapchat Access Token" value={snapchatAccessToken} onChange={(e) => setSnapchatAccessToken(e.target.value)} className="w-full bg-transparent border-none text-body-md text-text-primary focus:outline-none focus:ring-0 placeholder:text-text-muted/30 p-0" required />
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2 mt-2">
             <button
               type="button"
@@ -410,6 +434,10 @@ export default function AccountsPanel({
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" checked={editPlatforms.youtube} onChange={(e) => setEditPlatforms({ ...editPlatforms, youtube: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
                           <span className="text-sm text-text-primary flex items-center gap-1.5"><FaYoutube className="w-4 h-4" /> YouTube</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={editPlatforms.snapchat} onChange={(e) => setEditPlatforms({ ...editPlatforms, snapchat: e.target.checked })} className="rounded bg-surface border-outline/30 text-accent focus:ring-0 cursor-pointer" />
+                          <span className="text-sm text-text-primary flex items-center gap-1.5"><FaSnapchat className="w-4 h-4" /> Snapchat</span>
                         </label>
                       </div>
                     </div>
@@ -497,6 +525,17 @@ export default function AccountsPanel({
                         </div>
                       </div>
                     )}
+                    {editPlatforms.snapchat && (
+                      <div className="p-4 bg-surface/30 rounded border border-outline/10 flex flex-col gap-3">
+                        <span className="text-xs font-semibold text-text-secondary uppercase">Snapchat Credentials</span>
+                        <div className="input-underline">
+                          <div className="flex items-center border-b border-outline/30 pb-2 focus-within:border-transparent transition-colors">
+                            <KeyRound className="w-4 h-4 text-text-muted mr-3 flex-shrink-0" />
+                            <input type="password" placeholder="New Snapchat Access Token (leave blank to keep)" value={editSnapchatAccessToken} onChange={(e) => setEditSnapchatAccessToken(e.target.value)} className="w-full bg-transparent border-none text-base text-text-primary focus:outline-none focus:ring-0 p-0" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex justify-end gap-2 mt-2">
                       <button
                         type="button"
@@ -547,6 +586,7 @@ export default function AccountsPanel({
                                 {account.platforms_enabled.tiktok && <FaTiktok className="w-3.5 h-3.5" />}
                                 {account.platforms_enabled.x && <FaXTwitter className="w-3.5 h-3.5" />}
                                 {account.platforms_enabled.youtube && <FaYoutube className="w-3.5 h-3.5" />}
+                                {account.platforms_enabled.snapchat && <FaSnapchat className="w-3.5 h-3.5" />}
                               </div>
                             </>
                           )}

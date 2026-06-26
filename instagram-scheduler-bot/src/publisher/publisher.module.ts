@@ -12,6 +12,7 @@ import { FacebookPublisher } from './platforms/facebook.publisher';
 import { TiktokPublisher } from './platforms/tiktok.publisher';
 import { TwitterPublisher } from './platforms/x.publisher';
 import { YoutubePublisher } from './platforms/youtube.publisher';
+import { SnapchatPublisher } from './platforms/snapchat.publisher';
 
 @Module({
   imports: [DatabaseModule, CryptoModule, StorageModule, SchedulerModule],
@@ -23,6 +24,7 @@ import { YoutubePublisher } from './platforms/youtube.publisher';
     TiktokPublisher,
     TwitterPublisher,
     YoutubePublisher,
+    SnapchatPublisher,
     VerificationPollerService
   ],
 })

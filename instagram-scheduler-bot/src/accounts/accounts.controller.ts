@@ -24,6 +24,7 @@ interface PlatformsEnabled {
   tiktok: boolean;
   x: boolean;
   youtube: boolean;
+  snapchat: boolean;
 }
 
 interface CreateAccountDto {
@@ -35,6 +36,7 @@ interface CreateAccountDto {
   twitter_access_token?: string;
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
+  snapchat_access_token?: string;
   platforms_enabled: PlatformsEnabled;
   token_expiries?: Record<string, number>;
 }
@@ -48,6 +50,7 @@ interface UpdateAccountDto {
   twitter_access_token?: string;
   twitter_access_secret?: string;
   youtube_refresh_token?: string;
+  snapchat_access_token?: string;
   platforms_enabled?: PlatformsEnabled;
   token_expiries?: Record<string, number>;
 }
@@ -110,6 +113,7 @@ export class AccountsController {
       twitter_access_token,
       twitter_access_secret,
       youtube_refresh_token,
+      snapchat_access_token,
       token_expiries
     } = body;
 
@@ -153,6 +157,10 @@ export class AccountsController {
     if (youtube_refresh_token?.trim()) {
       const { encryptedText, iv } = this.encryptionService.encrypt(youtube_refresh_token);
       insertData.youtube_refresh_token = `${iv}:${encryptedText}`;
+    }
+    if (snapchat_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(snapchat_access_token);
+      insertData.snapchat_access_token = `${iv}:${encryptedText}`;
     }
 
     const supabase = this.supabaseService.getClient();
@@ -244,6 +252,7 @@ export class AccountsController {
       twitter_access_token,
       twitter_access_secret,
       youtube_refresh_token,
+      snapchat_access_token,
       platforms_enabled,
       token_expiries
     } = body;
@@ -277,6 +286,10 @@ export class AccountsController {
     if (youtube_refresh_token?.trim()) {
       const { encryptedText, iv } = this.encryptionService.encrypt(youtube_refresh_token);
       updates.youtube_refresh_token = `${iv}:${encryptedText}`;
+    }
+    if (snapchat_access_token?.trim()) {
+      const { encryptedText, iv } = this.encryptionService.encrypt(snapchat_access_token);
+      updates.snapchat_access_token = `${iv}:${encryptedText}`;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -11,6 +11,7 @@ import { FacebookPublisher } from './platforms/facebook.publisher';
 import { TiktokPublisher } from './platforms/tiktok.publisher';
 import { TwitterPublisher } from './platforms/x.publisher';
 import { YoutubePublisher } from './platforms/youtube.publisher';
+import { SnapchatPublisher } from './platforms/snapchat.publisher';
 
 const MAX_RETRY_COUNT = 3;
 const BASE_BACKOFF_DELAY_MS = 300_000;
@@ -36,6 +37,7 @@ export class CronPublisherService {
     private readonly tiktokPublisher: TiktokPublisher,
     private readonly twitterPublisher: TwitterPublisher,
     private readonly youtubePublisher: YoutubePublisher,
+    private readonly snapchatPublisher: SnapchatPublisher,
   ) {
     const slackToken = this.configService.get<string>('SLACK_BOT_TOKEN');
     this.slackClient = new WebClient(slackToken || undefined);
@@ -115,7 +117,7 @@ export class CronPublisherService {
         id, account_id, video_url, caption, scheduled_for, status, retry_count, published_platforms,
         accounts (
           username, platforms_enabled, instagram_business_id, facebook_page_id,
-          access_token, tiktok_access_token, twitter_access_token, twitter_access_secret, youtube_refresh_token,
+          access_token, tiktok_access_token, twitter_access_token, twitter_access_secret, youtube_refresh_token, snapchat_access_token,
           queue_status
         )
       `)
@@ -150,6 +152,7 @@ export class CronPublisherService {
       if (account.twitter_access_token) item.twitter_access_token = this.decryptToken(account.twitter_access_token);
       if (account.twitter_access_secret) item.twitter_access_secret = this.decryptToken(account.twitter_access_secret);
       if (account.youtube_refresh_token) item.youtube_refresh_token = this.decryptToken(account.youtube_refresh_token);
+      if (account.snapchat_access_token) item.snapchat_access_token = this.decryptToken(account.snapchat_access_token);
 
       await this.processItem(item);
     }
@@ -204,6 +207,10 @@ export class CronPublisherService {
         tasks.push(this.youtubePublisher.publish(item).then(() => ({ platform: 'youtube', status: 'fulfilled' as const })).catch((err) => ({ platform: 'youtube', status: 'rejected' as const, reason: err })));
         attemptedPlatforms.push('YouTube');
       }
+      if (item.platforms_enabled.snapchat && !published.has('snapchat')) {
+        tasks.push(this.snapchatPublisher.publish(item).then(() => ({ platform: 'snapchat', status: 'fulfilled' as const })).catch((err) => ({ platform: 'snapchat', status: 'rejected' as const, reason: err })));
+        attemptedPlatforms.push('Snapchat');
+      }
 
       // If there's nothing to attempt, this means either no platforms enabled, or all are already published.
       // But if it was stuck in pending/processing, we should just consider it fully published.
@@ -232,7 +239,7 @@ export class CronPublisherService {
         }
       }
 
-      const allEnabledPlatforms = ['instagram', 'facebook', 'tiktok', 'x', 'youtube'].filter((p) => (item.platforms_enabled as any)[p]);
+      const allEnabledPlatforms = ['instagram', 'facebook', 'tiktok', 'x', 'youtube', 'snapchat'].filter((p) => (item.platforms_enabled as any)[p]);
       const allPublished = allEnabledPlatforms.every((p) => newPublished.has(p));
 
       if (failures.length > 0) {
