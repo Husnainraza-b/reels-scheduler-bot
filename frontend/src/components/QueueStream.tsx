@@ -9,11 +9,14 @@ import {
   Pencil,
   Trash2,
   Film,
-  FileText
+  FileText,
+  Clock,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { FaInstagram, FaFacebook, FaTiktok, FaXTwitter, FaYoutube, FaSnapchat } from 'react-icons/fa6';
 import type { QueueItem, Account } from '../services/api';
-import { updateQueueCaption, deleteQueueItem } from '../services/api';
+import { updateQueueCaption, deleteQueueItem, scheduleQueueItem, swapQueueItem } from '../services/api';
 
 interface QueueStreamProps {
   queueItems: QueueItem[];
@@ -102,6 +105,11 @@ export default function QueueStream({
   const [isConfirmLocked, setIsConfirmLocked] = useState<boolean>(false);
   const [localQueueItems, setLocalQueueItems] = useState<QueueItem[]>(queueItems);
 
+  const [editingTimeId, setEditingTimeId] = useState<number | null>(null);
+  const [editTimeValue, setEditTimeValue] = useState<string>('');
+  const [isSavingTime, setIsSavingTime] = useState<boolean>(false);
+  const [isSwapping, setIsSwapping] = useState<number | null>(null);
+
   useEffect(() => {
     if (pendingDeleteId !== null) {
       setIsConfirmLocked(true);
@@ -177,6 +185,46 @@ export default function QueueStream({
     }
   };
 
+  const handleEditTimeClick = (item: QueueItem) => {
+    setEditingTimeId(item.id);
+    if (item.scheduled_for && !item.scheduled_for.includes('2099')) {
+      const zonedDate = toZonedTime(new Date(item.scheduled_for), TIMEZONE);
+      setEditTimeValue(format(zonedDate, "yyyy-MM-dd'T'HH:mm"));
+    } else {
+      setEditTimeValue('');
+    }
+  };
+
+  const handleSaveTime = async (id: number) => {
+    if (!editTimeValue) return;
+    setIsSavingTime(true);
+    try {
+      const pktDateString = editTimeValue + '+05:00';
+      const utcDate = new Date(pktDateString).toISOString();
+      await scheduleQueueItem(id, utcDate);
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to update time:', err);
+      alert('Failed to update schedule time. Please try again.');
+    } finally {
+      setIsSavingTime(false);
+      setEditingTimeId(null);
+    }
+  };
+
+  const handleSwap = async (id: number, direction: 'up' | 'down') => {
+    setIsSwapping(id);
+    try {
+      await swapQueueItem(id, direction);
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to swap:', err);
+      alert('Failed to reorder item.');
+    } finally {
+      setIsSwapping(null);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       {/* ─── Queue Header ─── */}
@@ -242,12 +290,54 @@ export default function QueueStream({
                 {/* Header: Time + Status + Actions */}
                 <div className="flex flex-wrap gap-y-3 gap-x-4 items-center justify-between mb-3">
                   <div className="flex items-baseline gap-3">
-                    <span className={`${statusCfg.isActive ? 'text-2xl font-normal text-text-primary' : 'text-xl text-text-secondary/80'}`}>
-                      {formatPKT(item.scheduled_for)}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded ${statusCfg.badgeClass}`}>
-                      {statusCfg.isActive || effectiveStatus === 'paused' ? statusCfg.label : getTimeUntil(item.scheduled_for)}
-                    </span>
+                    {editingTimeId === item.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="datetime-local"
+                          value={editTimeValue}
+                          onChange={(e) => setEditTimeValue(e.target.value)}
+                          className="bg-surface-card border border-outline/30 rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-accent"
+                          disabled={isSavingTime}
+                        />
+                        <button
+                          onClick={() => handleSaveTime(item.id)}
+                          disabled={isSavingTime}
+                          className="text-xs bg-accent text-surface px-2 py-1 rounded hover:opacity-90 disabled:opacity-50"
+                        >
+                          {isSavingTime ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          onClick={() => setEditingTimeId(null)}
+                          disabled={isSavingTime}
+                          className="text-xs text-text-secondary hover:text-text-primary px-2 py-1"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <span className={`${statusCfg.isActive ? 'text-2xl font-normal text-text-primary' : 'text-xl text-text-secondary/80'}`}>
+                          {formatPKT(item.scheduled_for)}
+                        </span>
+                        {(item.status === 'pending' || item.status === 'failed') && (
+                          <button
+                            onClick={() => handleEditTimeClick(item)}
+                            className="text-text-muted hover:text-text-primary cursor-pointer transition-colors"
+                            title="Edit Time"
+                          >
+                            <Clock className="w-4 h-4" />
+                          </button>
+                        )}
+                        <span className={`text-xs px-2 py-0.5 rounded ${statusCfg.badgeClass}`}>
+                          {statusCfg.isActive || effectiveStatus === 'paused' ? statusCfg.label : getTimeUntil(item.scheduled_for)}
+                        </span>
+                        {item.is_manual && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider bg-surface-high text-text-secondary px-1.5 py-0.5 rounded" title="Manually scheduled. Will not be overwritten by auto-reshuffle.">
+                            Manual
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* Actions (Always visible on mobile, hover on desktop) */}
@@ -278,6 +368,30 @@ export default function QueueStream({
                         </div>
                       ) : (
                         <>
+                          {item.status === 'pending' && (
+                            <div className="flex items-center border-r border-outline/20 pr-2 mr-2">
+                              {localQueueItems.findIndex(x => x.id === item.id) > 0 && (
+                                <button
+                                  onClick={() => handleSwap(item.id, 'up')}
+                                  disabled={isDeleting || isSwapping !== null}
+                                  className="text-text-secondary hover:text-text-primary cursor-pointer disabled:opacity-30 p-1"
+                                  title="Move Up"
+                                >
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                              )}
+                              {localQueueItems.findIndex(x => x.id === item.id) < localQueueItems.length - 1 && (
+                                <button
+                                  onClick={() => handleSwap(item.id, 'down')}
+                                  disabled={isDeleting || isSwapping !== null}
+                                  className="text-text-secondary hover:text-text-primary cursor-pointer disabled:opacity-30 p-1"
+                                  title="Move Down"
+                                >
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          )}
                           <button
                             onClick={() => handleEditClick(item)}
                             disabled={isDeleting}

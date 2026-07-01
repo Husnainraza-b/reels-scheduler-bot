@@ -44,6 +44,102 @@ export class QueueService {
   }
 
   /**
+   * Manually schedules a queue item to a specific date and time.
+   */
+  async scheduleItem(id: number | string, scheduledFor: string) {
+    const supabase = this.supabaseService.getClient();
+
+    const { data, error } = await supabase
+      .from('queue')
+      .update({ 
+        scheduled_for: scheduledFor,
+        is_manual: true
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      this.logger.error(
+        `Failed to schedule video #${id}: ${error.message}`,
+      );
+      throw new BadRequestException(
+        `Failed to schedule video: ${error.message}`,
+      );
+    }
+
+    return data;
+  }
+
+  /**
+   * Swaps a queue item up or down in the visual queue order.
+   */
+  async swapItem(id: number | string, direction: 'up' | 'down') {
+    const supabase = this.supabaseService.getClient();
+
+    // 1. Get the account ID of the item
+    const { data: currentItem, error: fetchError } = await supabase
+      .from('queue')
+      .select('account_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentItem) {
+      throw new NotFoundException(`Queue item #${id} not found.`);
+    }
+
+    // 2. Fetch all pending items for this account to determine the order
+    const { data: pendingItems, error: itemsError } = await supabase
+      .from('queue')
+      .select('id, scheduled_for, created_at, is_manual')
+      .eq('account_id', currentItem.account_id)
+      .eq('status', 'pending')
+      .order('scheduled_for', { ascending: true });
+
+    if (itemsError || !pendingItems) {
+      throw new BadRequestException('Failed to fetch queue items for swapping.');
+    }
+
+    const currentIndex = pendingItems.findIndex((item) => String(item.id) === String(id));
+    if (currentIndex === -1) {
+      throw new BadRequestException('Item is not in the pending queue.');
+    }
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= pendingItems.length) {
+      throw new BadRequestException(`Cannot move item ${direction}.`);
+    }
+
+    const itemA = pendingItems[currentIndex];
+    const itemB = pendingItems[targetIndex];
+
+    // 3. Swap their scheduling fields to exchange their slots exactly
+    const { error: swapAError } = await supabase
+      .from('queue')
+      .update({
+        scheduled_for: itemB.scheduled_for,
+        created_at: itemB.created_at,
+        is_manual: itemB.is_manual
+      })
+      .eq('id', itemA.id);
+
+    const { error: swapBError } = await supabase
+      .from('queue')
+      .update({
+        scheduled_for: itemA.scheduled_for,
+        created_at: itemA.created_at,
+        is_manual: itemA.is_manual
+      })
+      .eq('id', itemB.id);
+
+    if (swapAError || swapBError) {
+      throw new BadRequestException('Failed to swap items in the database.');
+    }
+
+    return { success: true };
+  }
+
+  /**
    * Deletes a queue item, cleans up R2 storage, and reshuffles remaining pending items.
    */
   async deleteAndReshuffle(id: number | string) {

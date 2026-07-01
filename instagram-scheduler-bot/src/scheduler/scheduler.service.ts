@@ -82,6 +82,7 @@ export class SchedulerService {
       .select('*')
       .eq('account_id', accountId)
       .eq('status', 'pending')
+      .eq('is_manual', false)
       .order('created_at', { ascending: true });
 
     if (fetchError) {

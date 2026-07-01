@@ -82,6 +82,7 @@ export interface QueueItem {
   published_platforms?: string[];
   slack_file_id: string | null;
   created_at: string;
+  is_manual?: boolean;
   platform_metadata?: Record<string, { media_id?: string; status?: string }>;
 }
 
@@ -202,6 +203,16 @@ export async function getQueue(accountId: number): Promise<QueueItem[]> {
 
 export async function updateQueueCaption(id: number, caption: string): Promise<QueueItem> {
   const { data } = await api.patch<QueueItem>(`/queue/${id}/caption`, { caption });
+  return data;
+}
+
+export async function scheduleQueueItem(id: number, scheduledFor: string): Promise<QueueItem> {
+  const { data } = await api.patch<QueueItem>(`/queue/${id}/schedule`, { scheduled_for: scheduledFor });
+  return data;
+}
+
+export async function swapQueueItem(id: number, direction: 'up' | 'down'): Promise<{ success: boolean }> {
+  const { data } = await api.patch<{ success: boolean }>(`/queue/${id}/swap`, { direction });
   return data;
 }
 

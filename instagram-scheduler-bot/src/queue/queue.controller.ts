@@ -22,6 +22,7 @@ interface QueueItemResponse {
   status: string;
   slack_file_id: string | null;
   created_at: string;
+  is_manual?: boolean;
 }
 
 @Controller()
@@ -96,6 +97,32 @@ export class QueueController {
       );
     }
     return this.queueService.updateCaption(id, body.caption);
+  }
+
+  @Patch('queue/:id/schedule')
+  async scheduleItem(
+    @Param('id') id: string,
+    @Body() body: { scheduled_for: string },
+  ) {
+    if (!body.scheduled_for) {
+      throw new BadRequestException(
+        'scheduled_for field is required in request body.',
+      );
+    }
+    return this.queueService.scheduleItem(id, body.scheduled_for);
+  }
+
+  @Patch('queue/:id/swap')
+  async swapItem(
+    @Param('id') id: string,
+    @Body() body: { direction: 'up' | 'down' },
+  ) {
+    if (body.direction !== 'up' && body.direction !== 'down') {
+      throw new BadRequestException(
+        'direction field must be "up" or "down".',
+      );
+    }
+    return this.queueService.swapItem(id, body.direction);
   }
 
   @Delete('queue/:id')

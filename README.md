@@ -79,7 +79,15 @@ This document serves as the absolute single source of truth for the entire Socia
   5. **Permanent Failures:** If a video is explicitly rejected by Meta *during the async verification phase* (e.g. copyright violation or corrupted format), it completely bypasses standard retries. It is permanently marked as `failed`, sorted to the absolute top of the Live Queue dashboard with a red "PERMANENTLY FAILED" banner, and a custom Slack alert is fired.
   6. **Automated Cleanups:** A background cron job securely deletes the Cloudflare R2 MP4 file for permanently failed items older than 2 days, and entirely purges their database rows after 30 days to keep the system clean.
 
-### 6. Analytics & Runway Tracking
+### 6. Manual Scheduling & Queue Reordering
+**Goal:** Allow admins to break out of the auto-scheduler to manually force exact posting times, and to easily visually rearrange the queue.
+- **Flow:**
+  1. **Manual Scheduling:** An admin can edit a video's specific time. This video gets marked with an `is_manual` flag.
+  2. **Reshuffle Protection:** The system's master "Lift and Restack" explicitly ignores `is_manual` videos, meaning they stay locked at their exact times even if the rest of the queue shifts wildly.
+  3. **Slot Sharing:** If a manual video lands on a normal slot, Gap Finder allows normal videos to overlap with it. The Cron Publisher will just post them sequentially, avoiding rate limits while keeping the schedule compact.
+  4. **Queue Swapping:** When admins click the Up/Down arrows to reorder videos, the backend perfectly swaps their assigned slots and creation timestamps in the database, seamlessly shifting their positions without breaking the stability of the entire queue.
+
+### 7. Analytics & Runway Tracking
 **Goal:** Give admins a bird's-eye view of account health and content buffers.
 - **Flow:**
   1. The Analytics module calculates global stats (total pending, published, failed).
